@@ -61,8 +61,7 @@ class QuizzesGenerator {
       throw Exception('User not authenticated');
     }
 
-    // final token = await user.getIdToken();
-    final token = "MY_TOKEN";
+    final token = await user.getIdToken();
     return {
       'Authorization': 'Bearer $token',
       'Content-Type': contentType.isNotEmpty ? contentType : 'application/json',

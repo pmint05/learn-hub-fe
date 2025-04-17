@@ -115,7 +115,7 @@ class _GenerateQuizzesScreenState extends State<GenerateQuizzesScreen>
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['pdf', 'docx', 'doc', 'txt', 'md'],
-      withData: true, // This ensures we have file data available
+      withData: true,
     );
 
     if (result != null) {
@@ -218,16 +218,59 @@ class _GenerateQuizzesScreenState extends State<GenerateQuizzesScreen>
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      padding: const EdgeInsets.fromLTRB(16, 24, 16, 12),
       decoration: BoxDecoration(
         color: cs.surface,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: cs.surfaceDim),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
+          Badge(
+            label:
+            currentTask.status == "processing"
+                ? Row(
+              children: [
+                SizedBox(
+                  height: 12,
+                  width: 12,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: statusColors[currentTask.status]?.withValues(
+                      alpha: 0.8,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  currentTask.status,
+                  style: TextStyle(
+                    color: statusColors[currentTask.status]?.withValues(
+                      alpha: 0.8,
+                    ),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            )
+                : Text(
+              currentTask.status,
+              style: TextStyle(
+                color: statusColors[currentTask.status]?.withValues(
+                  alpha: 0.8,
+                ),
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            backgroundColor: statusColors[currentTask.status]?.withValues(
+              alpha: 0.2,
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+          ),
+          const SizedBox(height: 16),
           Text(
             taskStatusesMessage[currentTask.status] ?? "Unknown status",
             style: TextStyle(
@@ -236,51 +279,8 @@ class _GenerateQuizzesScreenState extends State<GenerateQuizzesScreen>
               color: cs.onSurfaceVariant,
             ),
           ),
+
           const SizedBox(height: 8),
-          Badge(
-            label:
-                currentTask.status == "processing"
-                    ? Row(
-                      children: [
-                        SizedBox(
-                          height: 12,
-                          width: 12,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: statusColors[currentTask.status]?.withValues(
-                              alpha: 0.8,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          currentTask.status,
-                          style: TextStyle(
-                            color: statusColors[currentTask.status]?.withValues(
-                              alpha: 0.8,
-                            ),
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    )
-                    : Text(
-                      currentTask.status,
-                      style: TextStyle(
-                        color: statusColors[currentTask.status]?.withValues(
-                          alpha: 0.8,
-                        ),
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-            backgroundColor: statusColors[currentTask.status]?.withValues(
-              alpha: 0.2,
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-          ),
-          const SizedBox(height: 16),
           _buildTaskInfoRow("ID", currentTask.taskId),
           _buildTaskInfoRow("Type", currentTask.config.type.label),
           _buildTaskInfoRow("Mode", currentTask.config.mode.label),
@@ -785,13 +785,13 @@ class _GenerateQuizzesScreenState extends State<GenerateQuizzesScreen>
                               ),
                               enabledBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(8),
-                                borderSide: BorderSide(color: cs.surfaceDim),
+                                // borderSide: BorderSide(color: cs.surfaceDim),
                               ),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(8),
-                                borderSide: BorderSide(
-                                  color: cs.onSurface.withValues(alpha: 0.2),
-                                ),
+                                // borderSide: BorderSide(
+                                //   color: cs.onSurface.withValues(alpha: 0.2),
+                                // ),
                               ),
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(8),
@@ -896,12 +896,13 @@ class _GenerateQuizzesScreenState extends State<GenerateQuizzesScreen>
                         ),
                 backgroundColor:
                     selectedFileInfo == null || quizCount <= 0
-                        ? cs.onSurface.withValues(alpha: 0.25)
+                        ? cs.onSurface.withValues(alpha: 0.1)
                         : cs.primary,
                 foregroundColor:
                     selectedFileInfo == null || quizCount <= 0
                         ? cs.onSurface.withValues(alpha: 0.5)
                         : cs.onPrimary,
+                disabledElevation: 0,
                 elevation: 0,
                 highlightElevation: 0,
                 shape: RoundedRectangleBorder(
@@ -930,16 +931,16 @@ class _GenerateQuizzesScreenState extends State<GenerateQuizzesScreen>
         fillColor: cs.surface,
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: cs.surfaceDim),
+          // borderSide: BorderSide(color: cs.surfaceDim),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
           borderSide: BorderSide(color: cs.primary, width: 1.5),
         ),
-        outlineBorder: BorderSide(color: cs.primary, width: 1.5),
+        // outlineBorder: BorderSide(color: cs.primary, width: 1.5),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: cs.surfaceDim),
+          // borderSide: BorderSide(color: cs.surfaceDim),
         ),
       ),
       leadingIcon: Padding(

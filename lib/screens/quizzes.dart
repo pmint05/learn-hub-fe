@@ -158,7 +158,7 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
         ),
       ),
       floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 96.0),
+        padding: const EdgeInsets.only(bottom: 72.0),
         child: OpenContainer(
           openBuilder: (BuildContext context, VoidCallback _) {
             return const GenerateQuizzesScreen();
@@ -214,16 +214,14 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
 
   Widget _buildSearchBar(ColorScheme cs) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
       child: Row(
         children: [
           Expanded(
             child: Container(
-              height: 48,
               decoration: BoxDecoration(
-                color: cs.surface,
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: cs.outline.withValues(alpha: 0.5)),
+                color: cs.surface.withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
                     color: cs.shadow.withValues(alpha: 0.05),
@@ -236,6 +234,9 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
                 controller: _searchController,
                 decoration: InputDecoration(
                   hintText: "Search quizList...",
+                  hintStyle: TextStyle(
+                    color: cs.onSurface.withValues(alpha: 0.5),
+                  ),
                   prefixIcon: Icon(
                     PhosphorIconsRegular.magnifyingGlass,
                     color: cs.onSurfaceVariant,

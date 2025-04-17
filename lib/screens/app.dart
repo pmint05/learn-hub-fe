@@ -1,50 +1,60 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:learn_hub/configs/routes.dart';
 import 'package:learn_hub/providers/appbar_provider.dart';
+import 'package:learn_hub/widgets/bottom_nav.dart';
+import 'package:learn_hub/widgets/header.dart';
 import 'package:provider/provider.dart';
-import '../configs/routes.dart';
-import '../widgets/bottom_nav.dart';
-import '../widgets/header.dart';
 
-class App extends StatefulWidget {
-  const App({super.key});
+class App extends StatelessWidget {
+  final String currentLocation;
+  final Widget child;
 
-  @override
-  AppState createState() => AppState();
-}
-
-class AppState extends State<App> {
-  int _currentIndex = 1;
-  bool _isBottomNavBarVisible = true;
-
-  void _onItemTapped(int index) {
-    setState(() {
-      _currentIndex = index;
-      // _isBottomNavBarVisible = index != 2;
-    });
-  }
+  const App({
+    super.key,
+    required this.currentLocation,
+    required this.child,
+  });
 
   @override
   Widget build(BuildContext context) {
     final appbarProvider = Provider.of<AppBarProvider>(context);
     final action = appbarProvider.currentAction;
 
+    int currentIndex = 0;
+    String title = routes[0]["title"];
+
+    if (currentLocation.startsWith('/quizzes')) {
+      currentIndex = 1;
+      title = routes[1]["title"];
+    } else if (currentLocation.startsWith('/materials')) {
+      currentIndex = 2;
+      title = routes[2]["title"];
+    } else if (currentLocation.startsWith('/chat')) {
+      currentIndex = 3;
+      title = routes[3]["title"];
+    } else if (currentLocation.startsWith('/profile')) {
+      currentIndex = 4;
+      title = routes[4]["title"];
+    }
+
     return Scaffold(
+      key: ValueKey(currentLocation),
       appBar: Header(
-        title: routes[_currentIndex]["title"],
+        title: title,
         actionType: action.type,
         onPostfixActionTap: action.callback,
         notificationCount: action.notificationCount ?? 0,
         logoURL: "assets/images/logo.png",
       ),
-      body: routes[_currentIndex]["screen"],
+      body: child,
       extendBody: true,
-      bottomNavigationBar: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        height: _isBottomNavBarVisible ? 80 : 0,
-        child: BottomNavBar(
-          currentIndex: _currentIndex,
-          onItemTapped: _onItemTapped,
-        ),
+      bottomNavigationBar: BottomNavBar(
+        currentIndex: currentIndex,
+        onItemTapped: (index) {
+          final paths = ['/', '/quizzes', '/materials', '/chat', '/profile'];
+          context.go(paths[index]);
+        },
       ),
     );
   }

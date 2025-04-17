@@ -1,7 +1,6 @@
 import 'package:learn_hub/screens/quizzes.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../screens/home.dart';
-import '../screens/generate_quizzes.dart';
 import '../screens/materials.dart';
 import '../screens/ask.dart';
 import '../screens/profile.dart';
@@ -18,6 +17,7 @@ final List<Map<String, dynamic>> routes = [
     "label": "Home",
     "screen": const HomeScreen(),
     "showOnNav": true,
+    "route": "/",
   },
   {
     "icon": {
@@ -30,6 +30,7 @@ final List<Map<String, dynamic>> routes = [
     "label": "Quizzes",
     "screen": const QuizzesScreen(),
     "showOnNav": true,
+    "route": "/quizzes",
   },
   {
     "icon": {
@@ -42,6 +43,7 @@ final List<Map<String, dynamic>> routes = [
     "label": "Materials",
     "screen": const MaterialsScreen(),
     "showOnNav": true,
+    "route": "/materials",
   },
   {
     "icon": {
@@ -52,8 +54,9 @@ final List<Map<String, dynamic>> routes = [
     },
     "title": "Chat",
     "label": "Chat",
-    "screen": const AskScreen(),
+    "screen": (context, args) => AskScreen(),
     "showOnNav": true,
+    "route": "/chat"
   },
   {
     "icon": "",
@@ -62,5 +65,6 @@ final List<Map<String, dynamic>> routes = [
     "label": "",
     "screen": const ProfileScreen(),
     "showOnNav": false,
+    "route": "/profile"
   },
 ];

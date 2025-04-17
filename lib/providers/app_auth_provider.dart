@@ -28,6 +28,8 @@ class AppAuthProvider extends ChangeNotifier {
 
   bool get isLoading => _isLoading;
 
+  bool get isAuthed => _user != null;
+
   AppAuthProvider() {
     _initialize();
   }

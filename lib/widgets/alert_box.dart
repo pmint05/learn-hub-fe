@@ -33,8 +33,8 @@ class AlertBox extends StatefulWidget {
     this.cancelButton,
     this.onCancel,
     this.onOk,
-    this.padding = const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-    this.margin = const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
+    this.padding = const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+    this.margin = const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
     this.borderRadius = const BorderRadius.all(Radius.circular(20)),
   });
 

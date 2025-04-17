@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:learn_hub/const/constants.dart';
 import 'package:learn_hub/providers/app_auth_provider.dart';
 import 'package:learn_hub/screens/app.dart';
@@ -354,11 +355,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                         email: _emailController.text.trim(),
                                         password: _passwordController.text,
                                       );
-                                      Navigator.of(context).pushReplacement(
-                                        MaterialPageRoute(
-                                          builder: (context) => App(),
-                                        ),
-                                      );
+                                      if (context.mounted) {
+                                        context.go("/");
+                                      }
                                     } catch (e) {
                                       ScaffoldMessenger.of(
                                         context,
@@ -447,12 +446,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                         );
                                     final credential =
                                         await authProvider.signInWithGoogle();
-                                    if (credential != null) {
-                                      Navigator.of(context).pushReplacement(
-                                        MaterialPageRoute(
-                                          builder: (context) => App(),
-                                        ),
-                                      );
+                                    if (credential != null && context.mounted) {
+                                      context.go("/");
                                     }
                                   } catch (e) {
                                     print(e);

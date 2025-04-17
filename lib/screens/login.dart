@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:learn_hub/const/constants.dart';
 import 'package:learn_hub/providers/app_auth_provider.dart';
 import 'package:learn_hub/screens/app.dart';
@@ -256,11 +257,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                         email: _emailController.text.trim(),
                                         password: _passwordController.text,
                                       );
-                                      Navigator.of(context).pushReplacement(
-                                        MaterialPageRoute(
-                                          builder: (context) => App(),
-                                        ),
-                                      );
+                                      if (context.mounted) {
+                                        context.go("/");
+                                      }
                                     } catch (e) {
                                       print(e.toString());
                                       // Handle specific auth errors
@@ -378,11 +377,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                     final credential =
                                         await authProvider.signInWithGoogle();
                                     if (credential != null) {
-                                      Navigator.of(context).pushReplacement(
-                                        MaterialPageRoute(
-                                          builder: (context) => App(),
-                                        ),
-                                      );
+                                      if (context.mounted) {
+                                        context.go("/");
+                                      }
                                     }
                                   } catch (e) {
                                     ScaffoldMessenger.of(context).showSnackBar(

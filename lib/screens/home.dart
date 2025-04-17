@@ -6,6 +6,8 @@ import 'package:learn_hub/const/header_action.dart';
 import 'package:learn_hub/providers/appbar_provider.dart';
 import 'package:learn_hub/providers/app_auth_provider.dart';
 import 'package:learn_hub/providers/theme_provider.dart';
+import 'package:learn_hub/screens/generate_quizzes.dart';
+import 'package:learn_hub/screens/quizzes.dart';
 import 'package:learn_hub/widgets/alert_box.dart';
 import 'package:moment_dart/moment_dart.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -189,7 +191,7 @@ class _HomeScreenState extends State<HomeScreen>
                 _buildWelcomeCard(cs),
                 _buildQuickStats(cs),
                 AlertBox(
-                  subtitle: "Upgrade to PRO for more features 🌠",
+                  subtitle: "✨ Upgrade to PRO for more features and benefits.",
                   type: AlertBoxType.warning,
                   onOk: () {
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -198,7 +200,10 @@ class _HomeScreenState extends State<HomeScreen>
                   },
                   okButton: Text(
                     "Upgrade",
-                    style: TextStyle(color: cs.secondary, fontWeight: FontWeight.w700),
+                    style: TextStyle(
+                      color: cs.secondary,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
                 _buildRecentQuizzes(cs),
@@ -212,18 +217,27 @@ class _HomeScreenState extends State<HomeScreen>
           ),
         ),
       ),
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 72),
-        child: AnimatedSize(
-          duration: const Duration(milliseconds: 300),
-          // si: showFloatingButton ? 1 : 0,
-          child: FloatingActionButton.extended(
-            onPressed: () => _showCreateQuizBottomSheet(context),
-            label: const Text('Create Quiz'),
-            icon: const Icon(PhosphorIconsFill.plus),
-          ),
-        ),
-      ),
+      // floatingActionButton: Padding(
+      //   padding: const EdgeInsets.only(bottom: 72),
+      //   child: AnimatedSize(
+      //     duration: const Duration(milliseconds: 300),
+      //     // si: showFloatingButton ? 1 : 0,
+      //     child: FloatingActionButton.extended(
+      //       heroTag: "create_quiz",
+      //       shape: RoundedRectangleBorder(borderRadius: BorderRadiusGeometry.all(Radius.circular(30))),
+      //       onPressed:
+      //           () => {
+      //             Navigator.of(context).push(
+      //               MaterialPageRoute(
+      //                 builder: (context) => const GenerateQuizzesScreen(),
+      //               ),
+      //             ),
+      //           },
+      //       label: const Text('Create Quiz'),
+      //       icon: const Icon(PhosphorIconsRegular.plus),
+      //     ),
+      //   ),
+      // ),
     );
   }
 
@@ -317,7 +331,7 @@ class _HomeScreenState extends State<HomeScreen>
             ),
             const SizedBox(height: 12),
             Text(
-              'Upload documents, scan notes, or paste text to automatically generate quizzes.',
+              'Upload documents, enter number of questions, choose difficulty level, and get quizzes generated in seconds.',
               style: TextStyle(
                 fontSize: 14,
                 color: cs.onPrimaryContainer.withValues(alpha: 0.8),
@@ -325,8 +339,15 @@ class _HomeScreenState extends State<HomeScreen>
             ),
             const SizedBox(height: 16),
             OutlinedButton.icon(
-              onPressed: () => _showCreateQuizBottomSheet(context),
-              icon: const Icon(PhosphorIconsFill.plus),
+              onPressed:
+                  () => {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => const GenerateQuizzesScreen(),
+                      ),
+                    ),
+                  },
+              icon: const Icon(PhosphorIconsRegular.plus),
               label: const Text('Get Started'),
               style: OutlinedButton.styleFrom(
                 foregroundColor: cs.onPrimaryContainer,
