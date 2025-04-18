@@ -2,9 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-
 class AppAuthProvider extends ChangeNotifier {
-
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn();
@@ -36,23 +34,33 @@ class AppAuthProvider extends ChangeNotifier {
 
   Future<void> _initialize() async {
     _auth.authStateChanges().listen((User? user) async {
-      _user = user;
-
-      if (user != null) {
-        try {
-          _token = await user.getIdToken();
-          final idTokenResult = await _auth.currentUser?.getIdTokenResult();
-          _isAdmin = idTokenResult?.claims?['role'] == 'admin' ?? false;
-        } catch (e) {
-          _errorMessage = e.toString();
-        }
-      } else {
-        _userData = null;
-        _token = null;
-        _isAdmin = false;
-      }
-
+      // Set loading state to prevent premature redirects
+      _isLoading = true;
       notifyListeners();
+
+      try {
+        _user = user;
+
+        if (user != null) {
+          // Await these operations
+          _token = await user.getIdToken();
+          final idTokenResult = await user.getIdTokenResult();
+          _isAdmin = idTokenResult.claims?['role'] == 'admin';
+
+          // Fetch user data
+          await _fetchUserData();
+        } else {
+          _userData = null;
+          _token = null;
+          _isAdmin = false;
+        }
+      } catch (e) {
+        _errorMessage = e.toString();
+      } finally {
+        // Always turn off loading state when done
+        _isLoading = false;
+        notifyListeners();
+      }
     });
   }
 

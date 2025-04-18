@@ -1,6 +1,8 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:learn_hub/configs/router_config.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 class ResultScreen extends StatefulWidget {
@@ -291,7 +293,10 @@ class _ResultScreenState extends State<ResultScreen>
                   Expanded(
                     child: ElevatedButton.icon(
                       onPressed: () {
-                        Navigator.pop(context, "retake");
+                        context.pushNamed(
+                          AppRoute.doQuizzes.name,
+                          extra: widget.quizzes,
+                        );
                       },
                       icon: Icon(
                         PhosphorIconsRegular.arrowCounterClockwise,
@@ -317,7 +322,7 @@ class _ResultScreenState extends State<ResultScreen>
                   Expanded(
                     child: ElevatedButton.icon(
                       onPressed: () {
-                        Navigator.popUntil(context, (route) => route.isFirst);
+                        context.goNamed(AppRoute.quizzes.name);
                       },
                       icon: Icon(
                         PhosphorIconsRegular.checks,

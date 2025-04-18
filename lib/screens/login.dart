@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:learn_hub/configs/router_config.dart';
 import 'package:learn_hub/const/constants.dart';
 import 'package:learn_hub/providers/app_auth_provider.dart';
-import 'package:learn_hub/screens/app.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:learn_hub/screens/welcome.dart';
@@ -27,16 +27,13 @@ class _LoginScreenState extends State<LoginScreen> {
 
   // Điều hướng đến WelcomeScreen khi nhấn "Forget Password?"
   void _onForgotPassword() {
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (context) => const WelcomeScreen()));
+    context.goNamed(AppRoute.welcome.name);
+
   }
 
   // Điều hướng đến RegisterScreen khi nhấn "CREATE NEW ACCOUNT"
   void _onCreateNewAccount() {
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (context) => const RegisterScreen()));
+    context.go("/register");
   }
 
   @override

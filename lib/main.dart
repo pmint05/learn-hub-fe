@@ -1,6 +1,6 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:go_router/go_router.dart';
 import 'package:learn_hub/configs/router_config.dart';
 import 'package:learn_hub/configs/theme.dart';
 import 'package:learn_hub/firebase_options.dart';
@@ -11,13 +11,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 void main() async {
-
-  await dotenv.load(fileName: ".env");
-
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await dotenv.load(fileName: ".env");
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   runApp(
     MultiProvider(
@@ -31,14 +27,25 @@ void main() async {
   );
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
 
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  late final GoRouter _goRouter;
+
+  @override
+  void initState() {
+    super.initState();
+    final authProvider = Provider.of<AppAuthProvider>(context, listen: false);
+    _goRouter = createRouter(authProvider);
+  }
 
   @override
   Widget build(BuildContext context) {
-  final authProvider = Provider.of<AppAuthProvider>(context);
-  final router = createRouter(authProvider);
     return Consumer<ThemeProvider>(
       builder: (context, themeProvider, child) {
         return MaterialApp.router(
@@ -47,7 +54,7 @@ class MyApp extends StatelessWidget {
           theme: lightTheme,
           darkTheme: darkTheme,
           themeMode: themeProvider.themeMode,
-          routerConfig: router,
+          routerConfig: _goRouter,
         );
       },
     );

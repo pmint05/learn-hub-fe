@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:learn_hub/screens/do_quizzes_result.dart';
+import 'package:go_router/go_router.dart';
+import 'package:learn_hub/configs/router_config.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 class DoQuizzesScreen extends StatefulWidget {
@@ -183,33 +184,14 @@ class _DoQuizzesScreenState extends State<DoQuizzesScreen> {
                   onPressed: () {
                     Navigator.pop(context);
                     if (currentQuestionIndex == widget.quizzes.length - 1) {
-                      Navigator.of(context)
-                          .push(
-                            MaterialPageRoute(
-                              builder:
-                                  (context) => ResultScreen(
-                                    quizzes: widget.quizzes,
-                                    userAnswers: userAnswers,
-                                    answerResults: answerResults,
-                                  ),
-                            ),
-                          )
-                          .then((result) {
-                            if (result == "retake") {
-                              setState(() {
-                                currentQuestionIndex = 0;
-                                selectedAnswerIndex = null;
-                                userAnswers = List.filled(
-                                  widget.quizzes.length,
-                                  null,
-                                );
-                                answerResults = List.filled(
-                                  widget.quizzes.length,
-                                  false,
-                                );
-                              });
-                            }
-                          });
+                      context.goNamed(
+                        AppRoute.quizResults.name,
+                        extra: {
+                          "quizzes": widget.quizzes,
+                          "userAnswers": userAnswers,
+                          "answerResults": answerResults,
+                        },
+                      );
                     } else {
                       _nextQuestion();
                     }
@@ -281,53 +263,67 @@ class _DoQuizzesScreenState extends State<DoQuizzesScreen> {
     final progress = (currentQuestionIndex) / widget.quizzes.length;
     return Scaffold(
       key: _scaffoldKey,
+      appBar: PreferredSize(
+        preferredSize: Size.fromHeight(56.0),
+        child: Container(
+          padding: EdgeInsets.fromLTRB(0, 20, 16, 0),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            mainAxisSize: MainAxisSize.max,
+            children: [
+              IconButton(
+                constraints: BoxConstraints(),
+                padding: EdgeInsets.all(4),
+                onPressed: () {
+                  context.goNamed(
+                    AppRoute.quizzes.name,
+                  );
+                },
+                icon: Icon(
+                  PhosphorIconsBold.x,
+                  color: cs.onSurface.withValues(alpha: 0.5),
+                  size: 16,
+                ),
+              ),
+              Expanded(
+                child: TweenAnimationBuilder<double>(
+                  tween: Tween<double>(begin: 0.0, end: progress),
+                  duration: const Duration(milliseconds: 500),
+                  builder: (context, animatedValue, child) {
+                    return LinearProgressIndicator(
+                      borderRadius: BorderRadius.circular(8),
+                      value: animatedValue,
+                      backgroundColor: cs.surfaceDim,
+                      color: cs.primary,
+                      minHeight: 12,
+                      semanticsLabel: 'Quiz Progress',
+                      semanticsValue:
+                          '${currentQuestionIndex + 1}/${widget.quizzes.length}',
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                '${currentQuestionIndex + 1}/${widget.quizzes.length}',
+                style: const TextStyle(
+                  color: Colors.grey,
+                  fontWeight: FontWeight.w500,
+                  fontFamily: 'BricolageGrotesque',
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(16.0),
+          padding: const EdgeInsets.fromLTRB(16.0, 0, 16.0, 16.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                mainAxisSize: MainAxisSize.max,
-                children: [
-                  Expanded(
-                    flex: 11,
-                    child: TweenAnimationBuilder<double>(
-                      tween: Tween<double>(begin: 0.0, end: progress),
-                      duration: const Duration(milliseconds: 500),
-                      builder: (context, animatedValue, child) {
-                        return LinearProgressIndicator(
-                          borderRadius: BorderRadius.circular(8),
-                          value: animatedValue,
-                          backgroundColor: cs.surfaceDim,
-                          color: cs.primary,
-                          minHeight: 12,
-                          semanticsLabel: 'Quiz Progress',
-                          semanticsValue:
-                              '${currentQuestionIndex + 1}/${widget.quizzes.length}',
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    flex: 1,
-                    child: Text(
-                      '${currentQuestionIndex + 1}/${widget.quizzes.length}',
-                      style: const TextStyle(
-                        color: Colors.grey,
-                        fontWeight: FontWeight.w500,
-                        fontFamily: 'BricolageGrotesque',
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 30),
-
               Text(
                 'Question ${currentQuestionIndex + 1}:',
                 style: const TextStyle(

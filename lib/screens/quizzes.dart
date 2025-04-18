@@ -1,6 +1,8 @@
 import 'package:animations/animations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
+import 'package:go_router/go_router.dart';
+import 'package:learn_hub/configs/router_config.dart';
 import 'package:learn_hub/screens/generate_quizzes.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
@@ -157,34 +159,97 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
           ],
         ),
       ),
+
+      // floatingActionButton: Padding(
+      //   padding: const EdgeInsets.only(bottom: 72.0),
+      //   child: FloatingActionButton.extended(
+      //     onPressed: () {
+      //       showGeneralDialog(
+      //         context: context,
+      //         barrierDismissible: true,
+      //         barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
+      //         barrierColor: Colors.black54,
+      //         transitionDuration: const Duration(milliseconds: 300),
+      //         pageBuilder: (context, animation, secondaryAnimation) {
+      //           return const GenerateQuizzesScreen();
+      //         },
+      //         transitionBuilder: (context, animation, secondaryAnimation, child) {
+      //           final curvedAnimation = CurvedAnimation(
+      //             parent: animation,
+      //             curve: Curves.easeInOut,
+      //           );
+      //
+      //           return FadeTransition(
+      //             opacity: Tween<double>(begin: 0.0, end: 1.0).animate(curvedAnimation),
+      //             child: ScaleTransition(
+      //               scale: Tween<double>(begin: 0.9, end: 1).animate(curvedAnimation),
+      //               child: child,
+      //             ),
+      //           );
+      //         },
+      //       );
+      //     },
+      //     backgroundColor: cs.primary,
+      //     foregroundColor: cs.onPrimary,
+      //     icon: const Icon(PhosphorIconsRegular.plus),
+      //     label: const Text("Create Quiz"),
+      //     shape: RoundedRectangleBorder(
+      //       borderRadius: BorderRadius.circular(30),
+      //     ),
+      //   ),
+      // ),
+
+      // floatingActionButton: Padding(
+      //   padding: const EdgeInsets.only(bottom: 72.0),
+      //   child: OpenContainer(
+      //     routeSettings: RouteSettings(name: AppRoute.generateQuiz.name),
+      //     openBuilder: (BuildContext context, VoidCallback _) {
+      //       if (mounted) {
+      //         Future.microtask(
+      //           () => context.pushNamed(AppRoute.generateQuiz.name),
+      //         );
+      //       }
+      //       // Return an empty container as we're handling navigation differently
+      //       return Container(color: Theme.of(context).scaffoldBackgroundColor);
+      //     },
+      //     openColor: cs.surface,
+      //     closedElevation: 0,
+      //     openElevation: 0,
+      //     middleColor: Colors.transparent,
+      //     closedShape: const RoundedRectangleBorder(
+      //       borderRadius: BorderRadius.all(Radius.circular(25)),
+      //     ),
+      //     transitionType: ContainerTransitionType.fade,
+      //     transitionDuration: Duration(milliseconds: 500),
+      //     closedColor: Colors.transparent,
+      //     closedBuilder: (BuildContext context, VoidCallback openContainer) {
+      //       return FloatingActionButton.extended(
+      //         onPressed: openContainer,
+      //         backgroundColor: cs.primary,
+      //         foregroundColor: cs.onPrimary,
+      //         icon: const Icon(PhosphorIconsRegular.plus),
+      //         label: const Text("Create Quiz"),
+      //         shape: RoundedRectangleBorder(
+      //           borderRadius: BorderRadius.circular(30),
+      //         ),
+      //       );
+      //     },
+      //   ),
+      // ),
+      //
       floatingActionButton: Padding(
         padding: const EdgeInsets.only(bottom: 72.0),
-        child: OpenContainer(
-          openBuilder: (BuildContext context, VoidCallback _) {
-            return const GenerateQuizzesScreen();
+        child: FloatingActionButton.extended(
+          onPressed: () {
+            context.pushNamed(AppRoute.generateQuiz.name);
           },
-          openColor: cs.surface,
-          closedElevation: 0,
-          openElevation: 0,
-          middleColor: Colors.transparent,
-          closedShape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.all(Radius.circular(25)),
+          backgroundColor: cs.primary,
+          foregroundColor: cs.onPrimary,
+          icon: const Icon(PhosphorIconsRegular.plus),
+          label: const Text("Create Quiz"),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(30),
           ),
-          transitionType: ContainerTransitionType.fade,
-          transitionDuration: Duration(milliseconds: 500),
-          closedColor: Colors.transparent,
-          closedBuilder: (BuildContext context, VoidCallback openContainer) {
-            return FloatingActionButton.extended(
-              onPressed: openContainer,
-              backgroundColor: cs.primary,
-              foregroundColor: cs.onPrimary,
-              icon: const Icon(PhosphorIconsRegular.plus),
-              label: const Text("Create Quiz"),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(30),
-              ),
-            );
-          },
         ),
       ),
 
@@ -372,7 +437,7 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
       label: Text(label),
       selected: selected,
       onSelected: (value) {},
-      backgroundColor: cs.surfaceVariant,
+      backgroundColor: cs.surface,
       selectedColor: cs.primary.withValues(alpha: 0.2),
       labelStyle: TextStyle(color: selected ? cs.primary : cs.onSurfaceVariant),
       checkmarkColor: cs.primary,

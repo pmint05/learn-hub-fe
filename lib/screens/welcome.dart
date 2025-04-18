@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:go_router/go_router.dart';
+import 'package:learn_hub/configs/router_config.dart';
 import 'package:learn_hub/screens/login.dart';
 import 'package:learn_hub/screens/register.dart';
 
@@ -69,11 +71,7 @@ class WelcomeScreen extends StatelessWidget {
                         ),
                       ),
                       onPressed: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (context) => const LoginScreen(),
-                          ),
-                        );
+                        context.goNamed(AppRoute.login.name);
                       },
                       child: const Text('Login'),
                     ),
@@ -97,11 +95,7 @@ class WelcomeScreen extends StatelessWidget {
                         elevation: 0,
                       ),
                       onPressed: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (context) => const RegisterScreen(),
-                          ),
-                        );
+                        context.goNamed(AppRoute.register.name);
                       },
                       child: Text(
                         'Register',

@@ -2,14 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:learn_hub/const/constants.dart';
 import 'package:learn_hub/providers/app_auth_provider.dart';
-import 'package:learn_hub/screens/app.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:learn_hub/screens/login.dart';
 import 'package:provider/provider.dart';
 
 class RegisterScreen extends StatefulWidget {
-  const RegisterScreen({Key? key}) : super(key: key);
+  const RegisterScreen({super.key});
 
   @override
   State<RegisterScreen> createState() => _RegisterScreenState();
@@ -30,9 +29,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   String? _confirmPasswordError;
 
   void _onAlreadyHaveAccount() {
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (context) => const LoginScreen()));
+    context.go("/login");
   }
 
   final _formKey = GlobalKey<FormState>();

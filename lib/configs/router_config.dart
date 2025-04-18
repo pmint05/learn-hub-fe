@@ -3,11 +3,32 @@ import 'package:go_router/go_router.dart';
 import 'package:learn_hub/configs/router_keys.dart';
 import 'package:learn_hub/providers/app_auth_provider.dart';
 import 'package:learn_hub/screens/app.dart';
+import 'package:learn_hub/screens/do_quizzes.dart';
+import 'package:learn_hub/screens/do_quizzes_result.dart';
+import 'package:learn_hub/screens/generate_quizzes.dart';
 import 'package:learn_hub/screens/home.dart';
+import 'package:learn_hub/screens/login.dart';
 import 'package:learn_hub/screens/materials.dart';
 import 'package:learn_hub/screens/quizzes.dart';
 import 'package:learn_hub/screens/ask.dart';
 import 'package:learn_hub/screens/profile.dart';
+import 'package:learn_hub/screens/register.dart';
+import 'package:learn_hub/screens/welcome.dart';
+
+enum AppRoute {
+  home,
+  quizzes,
+  materials,
+  chat,
+  profile,
+  welcome,
+  login,
+  register,
+  doQuizzes,
+  quizResults,
+  generateQuiz,
+  settings,
+}
 
 GoRouter createRouter(AppAuthProvider authProvider) {
   return GoRouter(
@@ -17,71 +38,126 @@ GoRouter createRouter(AppAuthProvider authProvider) {
     refreshListenable: authProvider,
 
     redirect: (context, state) {
+      if (authProvider.isLoading) return null;
+
       final isLoggedIn = authProvider.isAuthed;
-      final isLoading = authProvider.isLoading;
       final showWelcome = authProvider.shouldShowWelcomeScreen();
       final isAuthRoute =
           state.matchedLocation == '/login' ||
           state.matchedLocation == '/register' ||
           state.matchedLocation == '/welcome';
 
-      if (isLoading) return null;
+      if (state.matchedLocation == '/login' ||
+          state.matchedLocation == '/register') {
+        return null;
+      }
 
-      // Show welcome screen if needed
-      if (showWelcome) return '/welcome';
+      if (showWelcome && state.matchedLocation != '/welcome') return '/welcome';
 
       if (!isLoggedIn && !isAuthRoute) return '/login';
-
       if (isLoggedIn && isAuthRoute) return '/';
 
-      // No redirect needed
       return null;
     },
 
-    routes: [
+    routes: <RouteBase>[
+      GoRoute(
+        path: "/welcome",
+        name: AppRoute.welcome.name,
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => const WelcomeScreen(),
+      ),
+      GoRoute(
+        path: "/login",
+        name: AppRoute.login.name,
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => const LoginScreen(),
+      ),
+      GoRoute(
+        path: "/register",
+        name: AppRoute.register.name,
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => const RegisterScreen(),
+      ),
+
+      GoRoute(
+        path: '/do-quizzes',
+        name: AppRoute.doQuizzes.name,
+        parentNavigatorKey: rootNavigatorKey,
+        pageBuilder: (context, state) {
+          final quizzes = state.extra as List<Map<String, dynamic>>;
+          return MaterialPage(
+            child: DoQuizzesScreen(quizzes: quizzes),
+          );
+        },
+      ),
+      GoRoute(
+        path: '/quiz-results',
+        name: AppRoute.quizResults.name,
+        parentNavigatorKey: rootNavigatorKey,
+        pageBuilder: (context, state) {
+          final params = state.extra as Map<String, dynamic>;
+          final quizzes = params['quizzes'] as List<Map<String, dynamic>>;
+          final userAnswers = params['userAnswers'] as List<int?>;
+          final answerResults = params['answerResults'] as List<bool>;
+
+          return MaterialPage(
+            child: ResultScreen(
+              quizzes: quizzes,
+              userAnswers: userAnswers,
+              answerResults: answerResults,
+            ),
+          );
+        },
+      ),
+
+      GoRoute(
+        path: "/generate-quiz",
+        name: AppRoute.generateQuiz.name,
+        parentNavigatorKey: rootNavigatorKey,
+        pageBuilder: (context, state) => const MaterialPage(
+          child: GenerateQuizzesScreen(),
+        ),
+      ),
+
       ShellRoute(
         navigatorKey: shellNavigatorKey,
         builder: (context, state, child) {
           return App(currentLocation: state.matchedLocation, child: child);
         },
         routes: [
-          // Home
           GoRoute(
             path: '/',
-            name: 'home',
+            name: AppRoute.home.name,
             builder: (context, state) => const HomeScreen(),
           ),
-
-          // Quizzes
           GoRoute(
             path: '/quizzes',
-            name: 'quizzes',
+            name: AppRoute.quizzes.name,
             builder: (context, state) => const QuizzesScreen(),
           ),
-
-          // Materials
           GoRoute(
             path: '/materials',
-            name: 'materials',
+            name: AppRoute.materials.name,
             builder: (context, state) => const MaterialsScreen(),
           ),
-
-          // Chat/Ask
           GoRoute(
             path: '/chat',
-            name: 'chat',
+            name: AppRoute.chat.name,
             builder: (context, state) {
               final materialIds = state.uri.queryParameters['materialIds']
                   ?.split(',');
               return AskScreen(materialIds: materialIds);
             },
           ),
-
-          // Profile
           GoRoute(
             path: '/profile',
-            name: 'profile',
-            builder: (context, state) => const ProfileScreen(),
+            name: AppRoute.profile.name,
+            builder: (context, state) {
+              print(state.name);
+              print(state.topRoute);
+              return const ProfileScreen();
+            },
           ),
         ],
       ),

@@ -10,36 +10,17 @@ class App extends StatelessWidget {
   final String currentLocation;
   final Widget child;
 
-  const App({
-    super.key,
-    required this.currentLocation,
-    required this.child,
-  });
+  const App({super.key, required this.currentLocation, required this.child});
 
   @override
   Widget build(BuildContext context) {
     final appbarProvider = Provider.of<AppBarProvider>(context);
     final action = appbarProvider.currentAction;
 
-    int currentIndex = 0;
-    String title = routes[0]["title"];
-
-    if (currentLocation.startsWith('/quizzes')) {
-      currentIndex = 1;
-      title = routes[1]["title"];
-    } else if (currentLocation.startsWith('/materials')) {
-      currentIndex = 2;
-      title = routes[2]["title"];
-    } else if (currentLocation.startsWith('/chat')) {
-      currentIndex = 3;
-      title = routes[3]["title"];
-    } else if (currentLocation.startsWith('/profile')) {
-      currentIndex = 4;
-      title = routes[4]["title"];
-    }
+    final currentIndex = _getNavIndexFromPath(currentLocation);
+    final title = routes[currentIndex]["title"];
 
     return Scaffold(
-      key: ValueKey(currentLocation),
       appBar: Header(
         title: title,
         actionType: action.type,
@@ -57,5 +38,13 @@ class App extends StatelessWidget {
         },
       ),
     );
+  }
+
+  int _getNavIndexFromPath(String path) {
+    if (path.startsWith('/profile')) return 4;
+    if (path.startsWith('/chat')) return 3;
+    if (path.startsWith('/materials')) return 2;
+    if (path.startsWith('/quizzes')) return 1;
+    return 0;
   }
 }

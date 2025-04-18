@@ -1,13 +1,15 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:math';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
+import 'package:learn_hub/configs/router_config.dart';
 import 'package:learn_hub/const/quizzes_generator_config.dart';
 import 'package:learn_hub/services/quizzes_generator.dart';
-import 'package:learn_hub/widgets/select_menu_tile.dart';
+
+// import 'package:learn_hub/widgets/select_menu_tile.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import 'do_quizzes.dart';
@@ -229,42 +231,42 @@ class _GenerateQuizzesScreenState extends State<GenerateQuizzesScreen>
         children: [
           Badge(
             label:
-            currentTask.status == "processing"
-                ? Row(
-              children: [
-                SizedBox(
-                  height: 12,
-                  width: 12,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: statusColors[currentTask.status]?.withValues(
-                      alpha: 0.8,
+                currentTask.status == "processing"
+                    ? Row(
+                      children: [
+                        SizedBox(
+                          height: 12,
+                          width: 12,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: statusColors[currentTask.status]?.withValues(
+                              alpha: 0.8,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          currentTask.status,
+                          style: TextStyle(
+                            color: statusColors[currentTask.status]?.withValues(
+                              alpha: 0.8,
+                            ),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    )
+                    : Text(
+                      currentTask.status,
+                      style: TextStyle(
+                        color: statusColors[currentTask.status]?.withValues(
+                          alpha: 0.8,
+                        ),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  currentTask.status,
-                  style: TextStyle(
-                    color: statusColors[currentTask.status]?.withValues(
-                      alpha: 0.8,
-                    ),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            )
-                : Text(
-              currentTask.status,
-              style: TextStyle(
-                color: statusColors[currentTask.status]?.withValues(
-                  alpha: 0.8,
-                ),
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
             backgroundColor: statusColors[currentTask.status]?.withValues(
               alpha: 0.2,
             ),
@@ -359,13 +361,9 @@ class _GenerateQuizzesScreenState extends State<GenerateQuizzesScreen>
                   final result = await _quizGenerator.getTaskResult(
                     currentTask.taskId,
                   );
-                  if (context.mounted) {
+                  if (mounted) {
                     _quizGenerator.clearCurrentTask();
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => DoQuizzesScreen(quizzes: result),
-                      ),
-                    );
+                    context.goNamed(AppRoute.doQuizzes.name, extra: result);
                   }
                 },
                 icon: Icon(PhosphorIconsRegular.clipboardText),
@@ -390,14 +388,9 @@ class _GenerateQuizzesScreenState extends State<GenerateQuizzesScreen>
                       final result = await _quizGenerator.getTaskResult(
                         currentTask.taskId,
                       );
-                      if (context.mounted) {
+                      if (mounted) {
                         _quizGenerator.clearCurrentTask();
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder:
-                                (context) => DoQuizzesScreen(quizzes: result),
-                          ),
-                        );
+                        context.push("/do-quizzes", extra: result);
                       }
                     }
                   } finally {
@@ -869,44 +862,45 @@ class _GenerateQuizzesScreenState extends State<GenerateQuizzesScreen>
                 ),
               ),
               const SizedBox(height: 8),
-              FloatingActionButton.extended(
+              ElevatedButton(
+                style: ButtonStyle(
+                  padding: WidgetStatePropertyAll(
+                    EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+                  ),
+                ),
                 onPressed:
                     selectedFileInfo == null || isGenerating || quizCount <= 0
                         ? null
                         : _generateQuizzes,
-                label:
-                    !isGenerating
-                        ? Text("Generate Quizzes")
-                        : Text(
-                          "Initializing... ${(progress * 100).toStringAsFixed(2).replaceAll(RegExp(r'\.00$'), '')}%",
-                        ),
-                icon:
-                    !isGenerating
-                        ? Icon(PhosphorIconsRegular.magicWand)
-                        : SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              cs.onPrimary,
-                            ),
-                            color: cs.onPrimary,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (isGenerating) ...[
+                      SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            cs.onPrimary,
                           ),
+                          color: cs.onPrimary,
                         ),
-                backgroundColor:
-                    selectedFileInfo == null || quizCount <= 0
-                        ? cs.onSurface.withValues(alpha: 0.1)
-                        : cs.primary,
-                foregroundColor:
-                    selectedFileInfo == null || quizCount <= 0
-                        ? cs.onSurface.withValues(alpha: 0.5)
-                        : cs.onPrimary,
-                disabledElevation: 0,
-                elevation: 0,
-                highlightElevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(30),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    Text(
+                      isGenerating
+                          ? "Initializing... ${(progress * 100).toStringAsFixed(2).replaceAll(".00", "")}%"
+                          : "Generate Quizzes",
+                      style: TextStyle(
+                        color:
+                            selectedFileInfo == null || quizCount <= 0
+                                ? cs.onSurface.withValues(alpha: 0.5)
+                                : cs.onPrimary,
+                      ),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 12),

@@ -1,15 +1,11 @@
 import 'dart:async';
-import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'package:learn_hub/screens/ask.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
-import 'package:provider/provider.dart';
 
 enum SortOption { nameAsc, nameDesc, dateAsc, dateDesc, sizeAsc, sizeDesc }
 
@@ -229,6 +225,7 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
   void _showSortFilterBottomSheet() {
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
       isScrollControlled: true,
       builder:
           (context) => StatefulBuilder(
@@ -399,6 +396,8 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
 
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
+      isScrollControlled: true,
       builder:
           (context) => Column(
             mainAxisSize: MainAxisSize.min,
@@ -814,9 +813,10 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
               ],
             ),
           ),
-          if (_isLoading)
-            const Center(child: CircularProgressIndicator())
-          else if (_filteredDocuments.isEmpty)
+          if (_isLoading) ...[
+            const SizedBox(height: 16),
+            const Center(child: CircularProgressIndicator()),
+          ] else if (_filteredDocuments.isEmpty)
             Expanded(
               child: Center(
                 child: Column(
