@@ -28,7 +28,6 @@ class _LoginScreenState extends State<LoginScreen> {
   // Điều hướng đến WelcomeScreen khi nhấn "Forget Password?"
   void _onForgotPassword() {
     context.goNamed(AppRoute.welcome.name);
-
   }
 
   // Điều hướng đến RegisterScreen khi nhấn "CREATE NEW ACCOUNT"
@@ -97,28 +96,28 @@ class _LoginScreenState extends State<LoginScreen> {
                                   color: cs.onSurface.withValues(alpha: 0.2),
                                   width: 1,
                                 ),
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(12),
                               ),
                               focusedBorder: OutlineInputBorder(
                                 borderSide: BorderSide(
                                   color: cs.primary,
                                   width: 1.5,
                                 ),
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(12),
                               ),
                               errorBorder: OutlineInputBorder(
                                 borderSide: BorderSide(
                                   color: Colors.red,
                                   width: 1,
                                 ),
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(12),
                               ),
                               focusedErrorBorder: OutlineInputBorder(
                                 borderSide: BorderSide(
                                   color: Colors.red,
                                   width: 1.5,
                                 ),
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(12),
                               ),
                               errorText: _emailError,
                             ),
@@ -174,28 +173,28 @@ class _LoginScreenState extends State<LoginScreen> {
                                   color: cs.onSurface.withValues(alpha: 0.2),
                                   width: 1,
                                 ),
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(12),
                               ),
                               focusedBorder: OutlineInputBorder(
                                 borderSide: BorderSide(
                                   color: cs.primary,
                                   width: 1.5,
                                 ),
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(12),
                               ),
                               errorBorder: OutlineInputBorder(
                                 borderSide: BorderSide(
                                   color: Colors.red,
                                   width: 1,
                                 ),
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(12),
                               ),
                               focusedErrorBorder: OutlineInputBorder(
                                 borderSide: BorderSide(
                                   color: Colors.red,
                                   width: 1.5,
                                 ),
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(12),
                               ),
                               errorText: _passwordError,
                             ),
@@ -223,6 +222,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(height: 24),
                     SizedBox(
                       width: double.infinity,
+                      height: 56,
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 12),
@@ -303,9 +303,13 @@ class _LoginScreenState extends State<LoginScreen> {
                                 },
                         child:
                             _isLoading
-                                ? CircularProgressIndicator(
-                                  color: cs.onPrimary,
-                                  strokeWidth: 2,
+                                ? SizedBox(
+                                  height: 24,
+                                  width: 24,
+                                  child: CircularProgressIndicator(
+                                    color: cs.onPrimary,
+                                    strokeWidth: 2,
+                                  ),
                                 )
                                 : const Text("Log in"),
                       ),
@@ -315,7 +319,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: Material(
                         color: Colors.transparent,
                         child: InkWell(
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(12),
                           splashColor: cs.primary.withValues(alpha: 0.12),
                           highlightColor: cs.primary.withValues(alpha: 0.12),
                           onTap: _onForgotPassword,
@@ -335,7 +339,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(height: 24),
                     Row(
                       children: [
-                        Expanded(child: Divider(color: Theme.of(context).dividerColor,)),
+                        Expanded(
+                          child: Divider(color: Theme.of(context).dividerColor),
+                        ),
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 8),
                           child: Text(
@@ -345,7 +351,9 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
                         ),
-                        Expanded(child: Divider(color: Theme.of(context).dividerColor,)),
+                        Expanded(
+                          child: Divider(color: Theme.of(context).dividerColor),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 24),
@@ -419,7 +427,7 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Material(
                 color: Colors.transparent,
                 child: InkWell(
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(12),
                   splashColor: cs.primary.withValues(alpha: 0.12),
                   highlightColor: cs.primary.withValues(alpha: 0.12),
                   onTap: _onCreateNewAccount,

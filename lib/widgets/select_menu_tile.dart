@@ -34,7 +34,7 @@ class _SelectMenuTileState extends State<SelectMenuTile> {
         Material(
           color: Colors.transparent,
           child: InkWell(
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(12),
             onTap: () {
               setState(() {
                 isExpanded = !isExpanded;
@@ -44,7 +44,7 @@ class _SelectMenuTileState extends State<SelectMenuTile> {
               padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
                 border: Border.all(color: cs.surfaceDim),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
                 children: [
@@ -82,7 +82,7 @@ class _SelectMenuTileState extends State<SelectMenuTile> {
             decoration: BoxDecoration(
               color: cs.surface,
               border: Border.all(color: cs.surfaceDim),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(12),
             ),
             child: Column(
               children: widget.menu.map((item) {

@@ -93,6 +93,7 @@ class _GenerateQuizzesScreenState extends State<GenerateQuizzesScreen>
     "processing": Colors.blue,
     "completed": Colors.green,
     "failed": Colors.red,
+    "error": Colors.red,
   };
 
   final fileIcons = {
@@ -109,6 +110,7 @@ class _GenerateQuizzesScreenState extends State<GenerateQuizzesScreen>
     "completed": "Your quiz is ready to use.",
     "not_found": "Task not found.",
     "failed": "Failed to generate quiz.",
+    "error": "An error occurred while generating the quiz.",
   };
 
   final _formKey = GlobalKey<FormState>();
@@ -296,19 +298,23 @@ class _GenerateQuizzesScreenState extends State<GenerateQuizzesScreen>
             if (currentTask.errorMessage.isNotEmpty)
               Container(
                 decoration: BoxDecoration(
-                  color: cs.errorContainer,
-                  borderRadius: BorderRadius.circular(8),
+                  color: cs.error.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: cs.error),
                 ),
+                padding: EdgeInsets.symmetric(vertical: 8, horizontal: 12),
                 child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  spacing: 10,
                   children: [
-                    Icon(
-                      PhosphorIconsRegular.fileX,
-                      color: Colors.red.shade900,
-                    ),
-                    Text(
-                      currentTask.errorMessage,
-                      style: TextStyle(color: Colors.red.shade900),
+                    Icon(PhosphorIconsRegular.fileX, color: cs.error),
+                    Flexible(
+                      child: Text(
+                        currentTask.errorMessage,
+                        style: TextStyle(color: cs.error),
+                      ),
                     ),
                   ],
                 ),
@@ -363,7 +369,15 @@ class _GenerateQuizzesScreenState extends State<GenerateQuizzesScreen>
                   );
                   if (mounted) {
                     _quizGenerator.clearCurrentTask();
-                    context.goNamed(AppRoute.doQuizzes.name, extra: result);
+                    setState(() {
+                      isGenerating = false;
+                      progress = 0.0;
+                      progressMessage = "";
+                    });
+                    context.pushNamed(
+                      AppRoute.doQuizzes.name,
+                      extra: {'quizzes': result, 'prevRoute': null},
+                    );
                   }
                 },
                 icon: Icon(PhosphorIconsRegular.clipboardText),
@@ -390,7 +404,10 @@ class _GenerateQuizzesScreenState extends State<GenerateQuizzesScreen>
                       );
                       if (mounted) {
                         _quizGenerator.clearCurrentTask();
-                        context.push("/do-quizzes", extra: result);
+                        context.pushNamed(
+                          AppRoute.doQuizzes.name,
+                          extra: {'quizzes': result, 'prevRoute': null},
+                        );
                       }
                     }
                   } finally {
@@ -459,7 +476,7 @@ class _GenerateQuizzesScreenState extends State<GenerateQuizzesScreen>
         "label": "File",
         "icon": PhosphorIconsBold.file,
         "content": Material(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(12),
           child: InkWell(
             onTap: isGenerating ? null : _pickFile,
             borderRadius: BorderRadius.vertical(bottom: Radius.circular(8)),
@@ -613,7 +630,7 @@ class _GenerateQuizzesScreenState extends State<GenerateQuizzesScreen>
                   Container(
                     decoration: BoxDecoration(
                       color: cs.surface,
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(12),
                       boxShadow: [
                         if (!isDark)
                           BoxShadow(
@@ -777,17 +794,17 @@ class _GenerateQuizzesScreenState extends State<GenerateQuizzesScreen>
                                 ),
                               ),
                               enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(12),
                                 // borderSide: BorderSide(color: cs.surfaceDim),
                               ),
                               border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(12),
                                 // borderSide: BorderSide(
                                 //   color: cs.onSurface.withValues(alpha: 0.2),
                                 // ),
                               ),
                               focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(12),
                                 borderSide: BorderSide(
                                   color: cs.primary,
                                   width: 1.5,
@@ -924,16 +941,16 @@ class _GenerateQuizzesScreenState extends State<GenerateQuizzesScreen>
         filled: true,
         fillColor: cs.surface,
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(12),
           // borderSide: BorderSide(color: cs.surfaceDim),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: cs.primary, width: 1.5),
         ),
         // outlineBorder: BorderSide(color: cs.primary, width: 1.5),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(12),
           // borderSide: BorderSide(color: cs.surfaceDim),
         ),
       ),

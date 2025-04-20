@@ -1,12 +1,15 @@
+import 'package:animations/animations.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:learn_hub/configs/router_config.dart';
+import 'package:learn_hub/screens/do_quizzes_result.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 class DoQuizzesScreen extends StatefulWidget {
   final List<Map<String, dynamic>> quizzes;
+  final AppRoute? prevRoute;
 
-  const DoQuizzesScreen({super.key, required this.quizzes});
+  const DoQuizzesScreen({super.key, required this.quizzes, this.prevRoute});
 
   @override
   State<DoQuizzesScreen> createState() => _DoQuizzesScreenState();
@@ -184,14 +187,52 @@ class _DoQuizzesScreenState extends State<DoQuizzesScreen> {
                   onPressed: () {
                     Navigator.pop(context);
                     if (currentQuestionIndex == widget.quizzes.length - 1) {
-                      context.goNamed(
-                        AppRoute.quizResults.name,
-                        extra: {
-                          "quizzes": widget.quizzes,
-                          "userAnswers": userAnswers,
-                          "answerResults": answerResults,
+                      // context.pushNamed(
+                      //   AppRoute.quizResults.name,
+                      //   extra: {
+                      //     "quizzes": widget.quizzes,
+                      //     "userAnswers": userAnswers,
+                      //     "answerResults": answerResults,
+                      //   },
+                      // );
+                      showGeneralDialog(
+                        context: context,
+                        barrierDismissible: true,
+                        barrierLabel:
+                            MaterialLocalizations.of(
+                              context,
+                            ).modalBarrierDismissLabel,
+                        pageBuilder: (context, animation, secondaryAnimation) {
+                          return SharedAxisTransition(
+                            fillColor: cs.surface,
+                            transitionType: SharedAxisTransitionType.horizontal,
+                            animation: animation,
+                            secondaryAnimation: secondaryAnimation,
+                            child: ResultScreen(
+                              quizzes: widget.quizzes,
+                              userAnswers: userAnswers,
+                              answerResults: answerResults,
+                            ),
+                          );
                         },
-                      );
+                      ).then((result) {
+                        if (result != null &&
+                            result is Map &&
+                            result['action'] == 'retake') {
+                          setState(() {
+                            currentQuestionIndex = 0;
+                            selectedAnswerIndex = null;
+                            userAnswers = List.filled(
+                              widget.quizzes.length,
+                              null,
+                            );
+                            answerResults = List.filled(
+                              widget.quizzes.length,
+                              false,
+                            );
+                          });
+                        }
+                      });
                     } else {
                       _nextQuestion();
                     }
@@ -242,7 +283,11 @@ class _DoQuizzesScreenState extends State<DoQuizzesScreen> {
         appBar: AppBar(
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
-            onPressed: () => Navigator.pop(context),
+            onPressed:
+                () =>
+                    context.canPop()
+                        ? context.pop()
+                        : context.goNamed(AppRoute.quizzes.name),
           ),
         ),
       );
@@ -276,9 +321,14 @@ class _DoQuizzesScreenState extends State<DoQuizzesScreen> {
                 constraints: BoxConstraints(),
                 padding: EdgeInsets.all(4),
                 onPressed: () {
-                  context.goNamed(
-                    AppRoute.quizzes.name,
-                  );
+                  print(context.canPop());
+                  if (widget.prevRoute != null) {
+                    context.goNamed(widget.prevRoute!.name);
+                  } else {
+                    if (context.canPop()) {
+                      context.pop();
+                    }
+                  }
                 },
                 icon: Icon(
                   PhosphorIconsBold.x,
@@ -292,7 +342,7 @@ class _DoQuizzesScreenState extends State<DoQuizzesScreen> {
                   duration: const Duration(milliseconds: 500),
                   builder: (context, animatedValue, child) {
                     return LinearProgressIndicator(
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(12),
                       value: animatedValue,
                       backgroundColor: cs.surfaceDim,
                       color: cs.primary,
@@ -342,7 +392,6 @@ class _DoQuizzesScreenState extends State<DoQuizzesScreen> {
                   fontFamily: 'BricolageGrotesque',
                 ),
               ),
-
               const Spacer(),
               ...List.generate(
                 currentQuiz['options'].length,

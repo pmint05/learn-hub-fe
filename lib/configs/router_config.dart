@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:learn_hub/configs/router_keys.dart';
@@ -13,11 +15,13 @@ import 'package:learn_hub/screens/quizzes.dart';
 import 'package:learn_hub/screens/ask.dart';
 import 'package:learn_hub/screens/profile.dart';
 import 'package:learn_hub/screens/register.dart';
+import 'package:learn_hub/screens/search_quizzes.dart';
 import 'package:learn_hub/screens/welcome.dart';
 
 enum AppRoute {
   home,
   quizzes,
+  searchQuizzes,
   materials,
   chat,
   profile,
@@ -85,9 +89,11 @@ GoRouter createRouter(AppAuthProvider authProvider) {
         name: AppRoute.doQuizzes.name,
         parentNavigatorKey: rootNavigatorKey,
         pageBuilder: (context, state) {
-          final quizzes = state.extra as List<Map<String, dynamic>>;
+          final params = state.extra as Map<String, dynamic>;
+          final quizzes = params['quizzes'] as List<Map<String, dynamic>>;
+          final prevRoute = params.containsKey('prevRoute') ? params['prevRoute'] as AppRoute? : null;
           return MaterialPage(
-            child: DoQuizzesScreen(quizzes: quizzes),
+            child: DoQuizzesScreen(quizzes: quizzes, prevRoute: prevRoute),
           );
         },
       ),
@@ -115,9 +121,26 @@ GoRouter createRouter(AppAuthProvider authProvider) {
         path: "/generate-quiz",
         name: AppRoute.generateQuiz.name,
         parentNavigatorKey: rootNavigatorKey,
-        pageBuilder: (context, state) => const MaterialPage(
-          child: GenerateQuizzesScreen(),
-        ),
+        pageBuilder:
+            (context, state) =>
+                const MaterialPage(child: GenerateQuizzesScreen()),
+      ),
+
+      GoRoute(
+        path: '/search-quizzes',
+        name: AppRoute.searchQuizzes.name,
+        parentNavigatorKey: rootNavigatorKey,
+        pageBuilder: (context, state) {
+          final params = state.extra as Map<String, dynamic>;
+          return MaterialPage(
+            child: SearchQuizzesScreen(
+              title: params['title'],
+              filterParams: params['filterParams'],
+              icon: params['icon'],
+              iconColor: params['iconColor'],
+            ),
+          );
+        },
       ),
 
       ShellRoute(

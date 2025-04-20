@@ -54,6 +54,8 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
 
   Timer? _debounce;
 
+  late ColorScheme cs = Theme.of(context).colorScheme;
+
   @override
   void initState() {
     super.initState();
@@ -371,6 +373,14 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
           _currentSortOption = option;
         });
       },
+      backgroundColor: cs.surface,
+      labelStyle: TextStyle(color: isSelected ? cs.primary : cs.onSurfaceVariant),
+      selectedColor: cs.primary.withValues(alpha: 0.2),
+      checkmarkColor: cs.primary,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: isSelected ? cs.primary : cs.surfaceDim),
+      ),
     );
   }
 
@@ -388,12 +398,18 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
           _currentFilterFileType = type;
         });
       },
+      backgroundColor: cs.surface,
+      labelStyle: TextStyle(color: isSelected ? cs.primary : cs.onSurfaceVariant),
+      selectedColor: cs.primary.withValues(alpha: 0.2),
+      checkmarkColor: cs.primary,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: isSelected ? cs.primary : cs.surfaceDim),
+      ),
     );
   }
 
   void _showDocumentOptions(MaterialDocument doc) {
-    final cs = Theme.of(context).colorScheme;
-
     showModalBottomSheet(
       context: context,
       useRootNavigator: true,
@@ -403,6 +419,11 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.vertical(
+                    top: Radius.circular(25),
+                  ),
+                ),
                 leading: Icon(PhosphorIconsRegular.chatDots, color: cs.primary),
                 title: Text('Send to Chat'),
                 onTap: () {
@@ -559,7 +580,6 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
   }
 
   Widget _buildDocumentCard(MaterialDocument doc) {
-    final cs = Theme.of(context).colorScheme;
     final isSelected = _selectedDocuments.contains(doc.id);
 
     IconData getFileIcon() {
@@ -600,7 +620,7 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
           isSelected ? cs.primaryContainer.withValues(alpha: 0.7) : cs.surface,
       elevation: 1,
       child: InkWell(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(12),
         onTap: () {
           if (_isMultiSelectMode) {
             _toggleDocumentSelection(doc.id);
@@ -624,7 +644,7 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
                 height: 48,
                 decoration: BoxDecoration(
                   color: getFileColor().withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(getFileIcon(), color: getFileColor(), size: 24),
               ),
@@ -700,7 +720,6 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
       floatingActionButton: Padding(
@@ -779,12 +798,6 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
                             Row(
                               children: [
                                 IconButton(
-                                  icon: Icon(PhosphorIconsRegular.chatDots),
-                                  onPressed: () {
-                                    // Send to chat
-                                  },
-                                ),
-                                IconButton(
                                   icon: Icon(
                                     PhosphorIconsRegular.downloadSimple,
                                   ),
@@ -814,7 +827,7 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
             ),
           ),
           if (_isLoading) ...[
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
             const Center(child: CircularProgressIndicator()),
           ] else if (_filteredDocuments.isEmpty)
             Expanded(
@@ -847,22 +860,43 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
             )
           else
             Expanded(
-              child: AnimationLimiter(
-                child: ListView.builder(
-                  padding: const EdgeInsets.only(bottom: 80),
-                  itemCount: _filteredDocuments.length,
-                  itemBuilder: (context, index) {
-                    return AnimationConfiguration.staggeredList(
-                      position: index,
-                      duration: const Duration(milliseconds: 375),
-                      child: SlideAnimation(
-                        verticalOffset: 50.0,
-                        child: FadeInAnimation(
-                          child: _buildDocumentCard(_filteredDocuments[index]),
+              child: ShaderMask(
+                shaderCallback:
+                    (bounds) => LinearGradient(
+                      colors: [
+                        Colors.white,
+                        Colors.white,
+                        Colors.white,
+                        Colors.transparent,
+                      ],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      stops: [
+                        0.0,
+                        0.0,
+                        0.9,
+                        1.0,
+                      ]
+                    ).createShader(bounds),
+                child: AnimationLimiter(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.only(bottom: 80),
+                    itemCount: _filteredDocuments.length,
+                    itemBuilder: (context, index) {
+                      return AnimationConfiguration.staggeredList(
+                        position: index,
+                        duration: const Duration(milliseconds: 375),
+                        child: SlideAnimation(
+                          verticalOffset: 50.0,
+                          child: FadeInAnimation(
+                            child: _buildDocumentCard(
+                              _filteredDocuments[index],
+                            ),
+                          ),
                         ),
-                      ),
-                    );
-                  },
+                      );
+                    },
+                  ),
                 ),
               ),
             ),

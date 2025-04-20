@@ -1,9 +1,7 @@
-import 'package:animations/animations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:go_router/go_router.dart';
 import 'package:learn_hub/configs/router_config.dart';
-import 'package:learn_hub/screens/generate_quizzes.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 final Map<String, PhosphorIconData> subjectCategories = {
@@ -25,6 +23,8 @@ final Map<String, PhosphorIconData> subjectCategories = {
   "Programming": PhosphorIconsRegular.code,
 };
 
+enum Difficulty { all, easy, medium, hard }
+
 class QuizzesScreen extends StatefulWidget {
   final List<Map<String, dynamic>>? quizList;
 
@@ -37,7 +37,6 @@ class QuizzesScreen extends StatefulWidget {
 class _QuizzesScreenState extends State<QuizzesScreen> {
   final TextEditingController _searchController = TextEditingController();
 
-  // Sample data - replace with actual data in production
   final recentQuizzes = List.generate(
     5,
     (index) => {
@@ -111,6 +110,8 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
       },
     ),
   };
+
+  Difficulty selectedDifficulty = Difficulty.all;
 
   @override
   void dispose() {
@@ -370,6 +371,7 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
           Wrap(
             spacing: 8,
             children: [
+              _buildFilterChip(cs, "All", false),
               _buildFilterChip(cs, "Easy", true),
               _buildFilterChip(cs, "Medium", false),
               _buildFilterChip(cs, "Hard", false),
@@ -402,7 +404,7 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     side: BorderSide(color: cs.primary),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(12),
                     ),
                   ),
                   child: Text("Reset", style: TextStyle(color: cs.primary)),
@@ -418,7 +420,7 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     backgroundColor: cs.primary,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(12),
                     ),
                   ),
                   child: Text("Apply", style: TextStyle(color: cs.onPrimary)),
@@ -436,7 +438,9 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
     return FilterChip(
       label: Text(label),
       selected: selected,
-      onSelected: (value) {},
+      onSelected: (value) {
+
+      },
       backgroundColor: cs.surface,
       selectedColor: cs.primary.withValues(alpha: 0.2),
       labelStyle: TextStyle(color: selected ? cs.primary : cs.onSurfaceVariant),
@@ -468,7 +472,14 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
               ),
               TextButton(
                 onPressed: () {
-                  // View all generated quizList
+                  context.pushNamed(AppRoute.searchQuizzes.name, extra: {
+                    'title': 'Generated Quizzes',
+                    'filterParams': {
+                      'difficulty': 'All',
+                      'categories': [],
+                    },
+                    'icon': PhosphorIconsRegular.sparkle,
+                  });
                 },
                 child: Text("View All", style: TextStyle(color: cs.primary)),
               ),
@@ -631,7 +642,14 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
               ),
               TextButton(
                 onPressed: () {
-                  // View all recent quizList
+                  context.pushNamed(
+                    AppRoute.searchQuizzes.name,
+                    extra: {
+                      'title': 'Recent Quizzes',
+                      'filterParams': {'recent': true},
+                      'icon': PhosphorIconsRegular.clockCounterClockwise,
+                    },
+                  );
                 },
                 child: Text("View All", style: TextStyle(color: cs.primary)),
               ),
@@ -780,7 +798,15 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
               ),
               TextButton(
                 onPressed: () {
-                  // View all favorite quizList
+                  context.pushNamed(
+                    AppRoute.searchQuizzes.name,
+                    extra: {
+                      'title': 'Favorite Quizzes',
+                      'filterParams': {'favorite': true},
+                      'icon': PhosphorIconsFill.heart,
+                      'iconColor': Colors.red,
+                    },
+                  );
                 },
                 child: Text("View All", style: TextStyle(color: cs.primary)),
               ),

@@ -95,14 +95,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 borderSide: BorderSide(
                                   color: cs.onSurface.withValues(alpha: 0.2),
                                 ),
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(12),
                               ),
                               focusedBorder: OutlineInputBorder(
                                 borderSide: BorderSide(
                                   color: cs.primary,
                                   width: 1.5,
                                 ),
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(12),
                               ),
                             ),
                             style: TextStyle(color: cs.onSurface),
@@ -126,28 +126,28 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 borderSide: BorderSide(
                                   color: cs.onSurface.withValues(alpha: 0.2),
                                 ),
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(12),
                               ),
                               focusedBorder: OutlineInputBorder(
                                 borderSide: BorderSide(
                                   color: cs.primary,
                                   width: 1.5,
                                 ),
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(12),
                               ),
                               errorBorder: OutlineInputBorder(
                                 borderSide: BorderSide(
                                   color: Colors.red,
                                   width: 1,
                                 ),
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(12),
                               ),
                               focusedErrorBorder: OutlineInputBorder(
                                 borderSide: BorderSide(
                                   color: Colors.red,
                                   width: 1.5,
                                 ),
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(12),
                               ),
                               errorText: _emailError,
                             ),
@@ -202,28 +202,28 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 borderSide: BorderSide(
                                   color: cs.onSurface.withValues(alpha: 0.2),
                                 ),
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(12),
                               ),
                               focusedBorder: OutlineInputBorder(
                                 borderSide: BorderSide(
                                   color: cs.primary,
                                   width: 1.5,
                                 ),
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(12),
                               ),
                               errorBorder: OutlineInputBorder(
                                 borderSide: BorderSide(
                                   color: Colors.red,
                                   width: 1,
                                 ),
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(12),
                               ),
                               focusedErrorBorder: OutlineInputBorder(
                                 borderSide: BorderSide(
                                   color: Colors.red,
                                   width: 1.5,
                                 ),
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(12),
                               ),
                               errorText: _passwordError,
                             ),
@@ -258,28 +258,28 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 borderSide: BorderSide(
                                   color: cs.onSurface.withValues(alpha: 0.2),
                                 ),
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(12),
                               ),
                               focusedBorder: OutlineInputBorder(
                                 borderSide: BorderSide(
                                   color: cs.primary,
                                   width: 1.5,
                                 ),
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(12),
                               ),
                               errorBorder: OutlineInputBorder(
                                 borderSide: BorderSide(
                                   color: Colors.red,
                                   width: 1,
                                 ),
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(12),
                               ),
                               focusedErrorBorder: OutlineInputBorder(
                                 borderSide: BorderSide(
                                   color: Colors.red,
                                   width: 1.5,
                                 ),
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(12),
                               ),
                               errorText: _confirmPasswordError,
                             ),
@@ -302,6 +302,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     // Register button
                     SizedBox(
                       width: double.infinity,
+                      height: 56,
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 15),
@@ -381,9 +382,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 },
                         child:
                             _isLoading
-                                ? CircularProgressIndicator(
-                                  color: cs.onPrimary,
-                                  strokeWidth: 2,
+                                ? SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    color: cs.onPrimary,
+                                    strokeWidth: 2,
+                                  ),
                                 )
                                 : const Text(
                                   'Register',
@@ -495,7 +500,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   onTap: _onAlreadyHaveAccount,
                   splashColor: cs.primary.withValues(alpha: 0.12),
                   highlightColor: cs.primary.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(12),
                   child: Padding(
                     padding: const EdgeInsets.all(8.0),
                     child: Text(

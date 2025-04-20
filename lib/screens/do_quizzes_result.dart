@@ -235,7 +235,7 @@ class _ResultScreenState extends State<ResultScreen>
                     Container(
                       decoration: BoxDecoration(
                         color: cs.surface,
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: cs.surfaceDim),
                       ),
                       child: TabBar(
@@ -293,10 +293,7 @@ class _ResultScreenState extends State<ResultScreen>
                   Expanded(
                     child: ElevatedButton.icon(
                       onPressed: () {
-                        context.pushNamed(
-                          AppRoute.doQuizzes.name,
-                          extra: widget.quizzes,
-                        );
+                        Navigator.of(context).pop({'action': 'retake'});
                       },
                       icon: Icon(
                         PhosphorIconsRegular.arrowCounterClockwise,
@@ -304,10 +301,11 @@ class _ResultScreenState extends State<ResultScreen>
                       ),
                       label: Text("Retake"),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+                        backgroundColor:
+                            Theme.of(context).scaffoldBackgroundColor,
                         padding: EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(12),
                           side: BorderSide(color: cs.primary),
                         ),
                         textStyle: TextStyle(
@@ -322,7 +320,10 @@ class _ResultScreenState extends State<ResultScreen>
                   Expanded(
                     child: ElevatedButton.icon(
                       onPressed: () {
-                        context.goNamed(AppRoute.quizzes.name);
+                        if (context.canPop()) {
+                          context.pop();
+                          context.pop();
+                        }
                       },
                       icon: Icon(
                         PhosphorIconsRegular.checks,
@@ -333,7 +334,7 @@ class _ResultScreenState extends State<ResultScreen>
                         backgroundColor: cs.primary,
                         padding: EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(12),
                         ),
                         textStyle: TextStyle(
                           fontSize: 16,
@@ -353,10 +354,10 @@ class _ResultScreenState extends State<ResultScreen>
   }
 
   Widget _buildAnswersReview(
-      List<Map<String, dynamic>> quizzes,
-      List<int?> userAnswers,
-      bool? isCorrect,
-      ) {
+    List<Map<String, dynamic>> quizzes,
+    List<int?> userAnswers,
+    bool? isCorrect,
+  ) {
     // Create a stateful list to track expansion states
     final List<Map<String, dynamic>> filteredItems = [];
 
@@ -385,62 +386,60 @@ class _ResultScreenState extends State<ResultScreen>
       builder: (context, setState) {
         return filteredItems.isEmpty
             ? Center(
-          child: Text(
-            "No ${isCorrect == true ? 'correct' : 'incorrect'} answers",
-            style: TextStyle(
-              fontSize: 16,
-              color: cs.onSurfaceVariant,
-            ),
-          ),
-        )
+              child: Text(
+                "No ${isCorrect == true ? 'correct' : 'incorrect'} answers",
+                style: TextStyle(fontSize: 16, color: cs.onSurfaceVariant),
+              ),
+            )
             : ListView.builder(
-          physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.only(top: 10, bottom: 16),
-          itemCount: filteredItems.length,
-          itemBuilder: (context, index) {
-            final item = filteredItems[index];
-            final quiz = item['quiz'] as Map<String, dynamic>;
-            final userAnswer = item['userAnswer'] as int?;
-            final correctAnswerIndex = item['correctAnswerIndex'] as int;
-            final currentIsCorrect = item['currentIsCorrect'] as bool;
+              physics: const BouncingScrollPhysics(),
+              padding: const EdgeInsets.only(top: 10, bottom: 16),
+              itemCount: filteredItems.length,
+              itemBuilder: (context, index) {
+                final item = filteredItems[index];
+                final quiz = item['quiz'] as Map<String, dynamic>;
+                final userAnswer = item['userAnswer'] as int?;
+                final correctAnswerIndex = item['correctAnswerIndex'] as int;
+                final currentIsCorrect = item['currentIsCorrect'] as bool;
 
-            return ExpansionTile(
-              childrenPadding: EdgeInsets.all(12),
-              leading: Icon(
-                currentIsCorrect
-                    ? PhosphorIconsRegular.checkCircle
-                    : PhosphorIconsRegular.xCircle,
-                color: currentIsCorrect
-                    ? Theme.of(context).colorScheme.tertiary
-                    : Theme.of(context).colorScheme.error,
-              ),
-              title: Text(
-                quiz["question"],
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontFamily: 'BricolageGrotesque',
-                  fontSize: 12,
-                ),
-              ),
-              children: [
-                if (userAnswer != null)
-                  _buildAnswerColumn(
-                    "Your Answer:",
-                    quiz['options'][userAnswer],
-                    userAnswer == correctAnswerIndex,
-                    false,
+                return ExpansionTile(
+                  childrenPadding: EdgeInsets.all(12),
+                  leading: Icon(
+                    currentIsCorrect
+                        ? PhosphorIconsRegular.checkCircle
+                        : PhosphorIconsRegular.xCircle,
+                    color:
+                        currentIsCorrect
+                            ? Theme.of(context).colorScheme.tertiary
+                            : Theme.of(context).colorScheme.error,
                   ),
-                const SizedBox(height: 8),
-                _buildAnswerColumn(
-                  "Correct Answer:",
-                  quiz['options'][correctAnswerIndex],
-                  true,
-                  true,
-                ),
-              ],
+                  title: Text(
+                    quiz["question"],
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'BricolageGrotesque',
+                      fontSize: 12,
+                    ),
+                  ),
+                  children: [
+                    if (userAnswer != null)
+                      _buildAnswerColumn(
+                        "Your Answer:",
+                        quiz['options'][userAnswer],
+                        userAnswer == correctAnswerIndex,
+                        false,
+                      ),
+                    const SizedBox(height: 8),
+                    _buildAnswerColumn(
+                      "Correct Answer:",
+                      quiz['options'][correctAnswerIndex],
+                      true,
+                      true,
+                    ),
+                  ],
+                );
+              },
             );
-          },
-        );
       },
     );
   }
@@ -463,7 +462,7 @@ class _ResultScreenState extends State<ResultScreen>
                 : isCorrect
                 ? cs.tertiary.withValues(alpha: 0.15)
                 : cs.error.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
