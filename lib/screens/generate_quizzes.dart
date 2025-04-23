@@ -5,14 +5,15 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:learn_hub/configs/router_config.dart';
 import 'package:learn_hub/const/quizzes_generator_config.dart';
 import 'package:learn_hub/services/quizzes_generator.dart';
+import 'package:learn_hub/utils/api_helper.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 // import 'package:learn_hub/widgets/select_menu_tile.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
-
-import 'do_quizzes.dart';
 
 class GenerateQuizzesScreen extends StatefulWidget {
   const GenerateQuizzesScreen({super.key});
@@ -40,11 +41,11 @@ class _GenerateQuizzesScreenState extends State<GenerateQuizzesScreen>
               isCheckingStatus = true;
             });
           }
-          final status = await _quizGenerator.checkTaskStatus(
-            _quizGenerator.currentTask!.taskId,
-          );
-
-          if (status == 'completed' || status == 'failed') {
+          await _quizGenerator.checkCurrentTaskStatus();
+          final status = _quizGenerator.currentTask?.status ?? 'not_found';
+          if (status == 'completed' ||
+              status == 'failed' ||
+              status == 'error') {
             timer.cancel();
           }
         } catch (e) {
@@ -67,7 +68,6 @@ class _GenerateQuizzesScreenState extends State<GenerateQuizzesScreen>
     super.initState();
     tabController = TabController(initialIndex: 0, length: 4, vsync: this);
 
-    // Check for current task when screen loads
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _quizGenerator.loadCurrentTask();
       if (mounted) setState(() {});
@@ -75,8 +75,15 @@ class _GenerateQuizzesScreenState extends State<GenerateQuizzesScreen>
     });
   }
 
-  PlatformFile? selectedFileInfo;
-  File? selectedFile;
+  PlatformFile? _selectedFileInfo;
+  File? _selectedFile;
+  File? _selectedImageFile;
+  PlatformFile? _selectedImageInfo;
+  String? _previewImagePath;
+
+  TextEditingController textContentController = TextEditingController();
+  TextEditingController linkController = TextEditingController();
+
   bool isGenerating = false;
   double progress = 0.0;
   String progressMessage = "";
@@ -124,10 +131,49 @@ class _GenerateQuizzesScreenState extends State<GenerateQuizzesScreen>
 
     if (result != null) {
       setState(() {
-        selectedFileInfo = result.files.single;
-        if (selectedFileInfo!.path != null) {
-          selectedFile = File(selectedFileInfo!.path!);
+        _selectedFileInfo = result.files.single;
+        if (_selectedFileInfo!.path != null) {
+          _selectedFile = File(_selectedFileInfo!.path!);
         }
+      });
+    }
+  }
+
+  Future<void> _pickImage() async {
+    if (await Permission.mediaLibrary.request().isDenied) {
+      if (mounted) {
+        showGeneralDialog(
+          context: context,
+          pageBuilder: (_, __, ___) {
+            return AlertDialog(
+              title: const Text("Permission Denied"),
+              content: const Text("Please allow access to your media library."),
+              actions: [
+                TextButton(
+                  onPressed: () => context.pop(),
+                  child: const Text("OK"),
+                ),
+              ],
+            );
+          },
+        );
+      }
+      return;
+    }
+
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+    final imageSize = await pickedFile?.length() ?? 0;
+
+    if (pickedFile != null) {
+      setState(() {
+        _selectedImageFile = File(pickedFile.path);
+        _previewImagePath = pickedFile.path;
+        _selectedImageInfo = PlatformFile(
+          name: pickedFile.name,
+          size: imageSize,
+          path: _previewImagePath,
+        );
       });
     }
   }
@@ -150,7 +196,40 @@ class _GenerateQuizzesScreenState extends State<GenerateQuizzesScreen>
 
   Future<void> _generateQuizzes() async {
     if (_formKey.currentState!.validate()) {
-      if (selectedFile == null && selectedFileInfo == null) return;
+      // Validate based on the active tab
+      if (currentIndex == 0 &&
+          _selectedFile == null &&
+          _selectedFileInfo == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Please select a document file')),
+        );
+        return;
+      } else if (currentIndex == 1 &&
+          (textContentController.text.isEmpty ||
+              textContentController.text.length < 10)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Please enter sufficient text content (at least 10 characters)',
+            ),
+          ),
+        );
+        return;
+      } else if (currentIndex == 2 &&
+          _selectedImageFile == null &&
+          _selectedImageInfo == null) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Please select an image file')));
+        return;
+      } else if (currentIndex == 3 &&
+          (linkController.text.isEmpty ||
+              !Uri.parse(linkController.text).isAbsolute)) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Please enter a valid URL')));
+        return;
+      }
 
       setState(() {
         isGenerating = true;
@@ -159,8 +238,32 @@ class _GenerateQuizzesScreenState extends State<GenerateQuizzesScreen>
       });
 
       try {
+        File? file;
+        PlatformFile? info;
+        QuizzesSource sourceType;
+        switch (currentIndex) {
+          case 0:
+            sourceType = QuizzesSource.file;
+            file = _selectedFile;
+            info = _selectedFileInfo;
+            break;
+          case 1:
+            sourceType = QuizzesSource.text;
+            break;
+          case 2:
+            sourceType = QuizzesSource.image;
+            file = _selectedImageFile;
+            info = _selectedImageInfo;
+            break;
+          case 3:
+            sourceType = QuizzesSource.link;
+            break;
+          default:
+            sourceType = QuizzesSource.file;
+        }
+
         final config = QuizzesGeneratorConfig(
-          source: QuizzesSource.file,
+          source: sourceType,
           type: typeController.value,
           mode: modeController.value,
           difficulty: difficultyController.value,
@@ -170,8 +273,10 @@ class _GenerateQuizzesScreenState extends State<GenerateQuizzesScreen>
 
         await _quizGenerator.createQuizzesTask(
           config: config,
-          file: selectedFile,
-          fileInfo: selectedFileInfo,
+          file: file,
+          fileInfo: info,
+          text: textContentController.text,
+          url: linkController.text,
           onProgress: (progress, message) {
             setState(() {
               this.progress = progress;
@@ -395,9 +500,9 @@ class _GenerateQuizzesScreenState extends State<GenerateQuizzesScreen>
                     isCheckingStatus = true;
                   });
                   try {
-                    final status = await _quizGenerator.checkTaskStatus(
-                      currentTask.taskId,
-                    );
+                    await _quizGenerator.checkCurrentTaskStatus();
+                    final status =
+                        _quizGenerator.currentTask?.status ?? 'not_found';
                     if (status == 'completed' && context.mounted) {
                       final result = await _quizGenerator.getTaskResult(
                         currentTask.taskId,
@@ -467,6 +572,25 @@ class _GenerateQuizzesScreenState extends State<GenerateQuizzesScreen>
     );
   }
 
+  bool _isButtonEnabled() {
+    if (quizCount <= 0 || isGenerating) return false;
+
+    switch (currentIndex) {
+      case 0: // File tab
+        return _selectedFileInfo != null;
+      case 1: // Text tab
+        return textContentController.text.isNotEmpty &&
+            textContentController.text.length >= 10;
+      case 2: // Image tab
+        return _selectedImageInfo != null;
+      case 3: // Link tab
+        return linkController.text.isNotEmpty &&
+            Uri.parse(linkController.text).isAbsolute;
+      default:
+        return false;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -485,7 +609,7 @@ class _GenerateQuizzesScreenState extends State<GenerateQuizzesScreen>
               width: double.infinity,
               padding: EdgeInsets.all(10),
               child:
-                  selectedFileInfo == null
+                  _selectedFileInfo == null
                       ? Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         crossAxisAlignment: CrossAxisAlignment.center,
@@ -508,15 +632,17 @@ class _GenerateQuizzesScreenState extends State<GenerateQuizzesScreen>
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           PhosphorIcon(
-                            fileIcons[selectedFileInfo!.name.split('.').last] ??
+                            fileIcons[_selectedFileInfo!.name
+                                    .split('.')
+                                    .last] ??
                                 PhosphorIconsLight.file,
                             size: 36,
                           ),
                           SizedBox(height: 4),
                           Text(
-                            selectedFileInfo!.name.length > 20
-                                ? "${selectedFileInfo!.name.substring(0, 20)}...${selectedFileInfo!.name.split('.').last}"
-                                : selectedFileInfo!.name,
+                            _selectedFileInfo!.name.length > 20
+                                ? "${_selectedFileInfo!.name.substring(0, 20)}...${_selectedFileInfo!.name.split('.').last}"
+                                : _selectedFileInfo!.name,
                             style: TextStyle(color: cs.onSurface),
                             textAlign: TextAlign.center,
                           ),
@@ -539,6 +665,7 @@ class _GenerateQuizzesScreenState extends State<GenerateQuizzesScreen>
         "content": Padding(
           padding: EdgeInsets.symmetric(vertical: 10, horizontal: 16),
           child: TextFormField(
+            controller: textContentController,
             decoration: InputDecoration(
               border: InputBorder.none,
               counterStyle: TextStyle(
@@ -562,32 +689,102 @@ class _GenerateQuizzesScreenState extends State<GenerateQuizzesScreen>
       {
         "label": "Image",
         "icon": PhosphorIconsBold.image,
-        "content": Column(
-          children: [
-            TextFormField(),
-            SizedBox(
-              height: 30,
+        "content": Material(
+          borderRadius: BorderRadius.circular(12),
+          child: InkWell(
+            onTap: isGenerating ? null : _pickImage,
+            borderRadius: BorderRadius.vertical(bottom: Radius.circular(8)),
+            child: SizedBox(
+              height: 180,
               width: double.infinity,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  const Divider(),
-                  Text("OR", style: TextStyle(color: cs.onSurface)),
-                  const Divider(),
-                ],
-              ),
+              child:
+                  _selectedImageFile == null
+                      ? Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          PhosphorIcon(
+                            PhosphorIconsLight.uploadSimple,
+                            size: 56,
+                          ),
+                          Text(
+                            "Choose an image (png, jpg or jpeg file)!",
+                            style: TextStyle(
+                              color: cs.onSurface,
+                              fontFamily: "BricolageGrotesque",
+                            ),
+                          ),
+                        ],
+                      )
+                      : Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        spacing: 8,
+                        children: [
+                          if (_selectedImageFile != null &&
+                              _previewImagePath != null)
+                            Image.file(
+                              File(_previewImagePath!),
+                              height: 135,
+                              width: 500,
+                              frameBuilder: (
+                                context,
+                                child,
+                                frame,
+                                wasSynchronouslyLoaded,
+                              ) {
+                                if (wasSynchronouslyLoaded) {
+                                  return child;
+                                }
+                                return AnimatedOpacity(
+                                  opacity: frame == null ? 0 : 1,
+                                  duration: const Duration(milliseconds: 200),
+                                  curve: Curves.easeIn,
+                                  child: child,
+                                );
+                              },
+                              fit: BoxFit.contain,
+                            )
+                          else
+                            PhosphorIcon(PhosphorIconsLight.image, size: 36),
+                          Text(
+                            "Tap to change image",
+                            style: TextStyle(
+                              color: cs.onSurface.withValues(alpha: 0.5),
+                            ),
+                          ),
+                        ],
+                      ),
             ),
-            Container(child: const Placeholder()),
-          ],
+          ),
         ),
-        "disabled": true,
+        "disabled": false,
       },
       {
         "label": "Link",
         "icon": PhosphorIconsBold.link,
-        "content": const Placeholder(),
-        "disabled": true,
+        "content": Padding(
+          padding: EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+          child: TextFormField(
+            controller: linkController,
+            decoration: InputDecoration(
+              border: InputBorder.none,
+              counterStyle: TextStyle(
+                color: cs.onSurface.withValues(alpha: 0.5),
+              ),
+              hint: Text(
+                "Enter URL here...",
+                style: TextStyle(color: cs.onSurface.withValues(alpha: 0.5)),
+              ),
+            ),
+            minLines: 1,
+            maxLines: 5,
+            scrollPhysics: ScrollPhysics(
+              parent: NeverScrollableScrollPhysics(),
+            ),
+          ),
+        ),
+        "disabled": false,
       },
     ];
 
@@ -739,10 +936,10 @@ class _GenerateQuizzesScreenState extends State<GenerateQuizzesScreen>
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
                       colors: [
-                        Colors.transparent,
+                        cs.surface.withValues(alpha: 0),
                         Colors.white,
                         Colors.white,
-                        Colors.transparent,
+                        cs.surface.withValues(alpha: 0),
                       ],
                       stops: const [0.0, 0.03, 0.95, 1.0],
                     ).createShader(bounds);
@@ -776,7 +973,7 @@ class _GenerateQuizzesScreenState extends State<GenerateQuizzesScreen>
                               filled: true,
                               fillColor: cs.surface,
                               hint: Text(
-                                "Enter number of quizzes",
+                                "Enter number of questions",
                                 style: TextStyle(
                                   color: cs.onSurface.withValues(alpha: 0.5),
                                 ),
@@ -789,7 +986,7 @@ class _GenerateQuizzesScreenState extends State<GenerateQuizzesScreen>
                                   children: [
                                     Icon(PhosphorIconsRegular.hash, size: 24),
                                     SizedBox(width: 12),
-                                    Text("Number of Quizzes"),
+                                    Text("Number of Questions"),
                                   ],
                                 ),
                               ),
@@ -886,7 +1083,7 @@ class _GenerateQuizzesScreenState extends State<GenerateQuizzesScreen>
                   ),
                 ),
                 onPressed:
-                    selectedFileInfo == null || isGenerating || quizCount <= 0
+                    isGenerating || !_isButtonEnabled()
                         ? null
                         : _generateQuizzes,
                 child: Row(
@@ -912,9 +1109,9 @@ class _GenerateQuizzesScreenState extends State<GenerateQuizzesScreen>
                           : "Generate Quizzes",
                       style: TextStyle(
                         color:
-                            selectedFileInfo == null || quizCount <= 0
-                                ? cs.onSurface.withValues(alpha: 0.5)
-                                : cs.onPrimary,
+                            _isButtonEnabled()
+                                ? cs.onPrimary
+                                : cs.onSurface.withValues(alpha: 0.5),
                       ),
                     ),
                   ],
@@ -984,6 +1181,9 @@ class _GenerateQuizzesScreenState extends State<GenerateQuizzesScreen>
     typeController.dispose();
     quizCountController.dispose();
     tabController.dispose();
+    textContentController.dispose();
+    linkController.dispose();
+    _statusRefreshTimer?.cancel();
     super.dispose();
   }
 

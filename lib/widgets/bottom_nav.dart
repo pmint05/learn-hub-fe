@@ -54,10 +54,10 @@ class BottomNavBar extends StatelessWidget {
                       begin: Alignment.centerLeft,
                       end: Alignment.centerRight,
                       colors: [
-                        Colors.transparent,
+                        cs.surface.withValues(alpha:0),
                         Colors.white,
                         Colors.white,
-                        Colors.transparent,
+                        cs.surface.withValues(alpha:0),
                       ],
                       stops: const [0.0, 0.038, 0.95, 1.0],
                     ).createShader(bounds);

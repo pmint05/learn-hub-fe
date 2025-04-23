@@ -1,13 +1,17 @@
+import 'dart:math';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:learn_hub/models/user.dart';
 class AppAuthProvider extends ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn();
 
   User? _user;
+  AppUser? _appUser;
   Map<String, dynamic>? _userData;
   String? _token;
   bool _isAdmin = false;
@@ -15,6 +19,8 @@ class AppAuthProvider extends ChangeNotifier {
   bool _isLoading = false;
 
   User? get user => _user;
+
+  AppUser? get appUser => _appUser;
 
   Map<String, dynamic>? get userData => _userData;
 
@@ -34,7 +40,6 @@ class AppAuthProvider extends ChangeNotifier {
 
   Future<void> _initialize() async {
     _auth.authStateChanges().listen((User? user) async {
-      // Set loading state to prevent premature redirects
       _isLoading = true;
       notifyListeners();
 
@@ -42,12 +47,10 @@ class AppAuthProvider extends ChangeNotifier {
         _user = user;
 
         if (user != null) {
-          // Await these operations
           _token = await user.getIdToken();
           final idTokenResult = await user.getIdTokenResult();
           _isAdmin = idTokenResult.claims?['role'] == 'admin';
 
-          // Fetch user data
           await _fetchUserData();
         } else {
           _userData = null;
@@ -57,7 +60,6 @@ class AppAuthProvider extends ChangeNotifier {
       } catch (e) {
         _errorMessage = e.toString();
       } finally {
-        // Always turn off loading state when done
         _isLoading = false;
         notifyListeners();
       }
@@ -66,16 +68,32 @@ class AppAuthProvider extends ChangeNotifier {
 
   Future<void> _fetchUserData() async {
     if (_user != null) {
-      final docSnapShot =
-          await _firestore.collection('users').doc(_user!.uid).get();
-      if (docSnapShot.exists) {
-        _userData = docSnapShot.data();
+      try {
+        final docSnapShot = await _firestore.collection('users').doc(_user!.uid).get();
+        if (docSnapShot.exists) {
+          _userData = docSnapShot.data() ?? {};
+
+          if (_user!.displayName != null) {
+            _userData!['displayName'] = _user!.displayName;
+          }
+
+          _appUser = AppUser.fromJson(_userData!);
+
+          // print("AppUser created: ${_appUser?.toJson()}");
+        } else {
+          print("User document doesn't exist for uid: ${_user!.uid}");
+        }
+      } catch (e) {
+        print("Error fetching user data: $e");
+        _errorMessage = e.toString();
+      } finally {
+        notifyListeners();
       }
     }
   }
 
-  // Email/Password Registration
   Future<UserCredential> register({
+    required String username,
     required String email,
     required String password,
     String role = 'user',
@@ -87,7 +105,7 @@ class AppAuthProvider extends ChangeNotifier {
       );
 
       if (credential.user != null) {
-        await _createUserDocument(credential.user!, role);
+        await _createUserDocument(username, credential.user!, role);
       }
       return credential;
     } catch (e) {
@@ -97,10 +115,10 @@ class AppAuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> _createUserDocument(User user, String role) async {
+  Future<void> _createUserDocument(String username, User user, String role) async {
     try {
       await _firestore.collection('users').doc(user.uid).set({
-        'username': user.displayName ?? '',
+        'username': username,
         'uid': user.uid,
         'email': user.email,
         'role': role,
@@ -111,11 +129,48 @@ class AppAuthProvider extends ChangeNotifier {
         'isVIP': false,
         'VIPExpiration': null,
         'freeCreditsLastReset': null,
+        'birthday': null,
+        'gender': null,
+        'phoneNumber': null,
       });
     } catch (e) {
       _errorMessage = e.toString();
       notifyListeners();
       rethrow;
+    }
+  }
+
+  Future<void> updateUserData(Map<String, dynamic> updates) async {
+    if (_user == null || _userData == null || _appUser == null) {
+      _errorMessage = "Cannot update user data: User is not logged in";
+      notifyListeners();
+      return;
+    }
+
+    try {
+      // Update Firestore document
+      if (updates.containsKey('photoURL')) {
+        final localPhotoURL = updates['photoURL'];
+        _auth.currentUser?.updatePhotoURL(localPhotoURL);
+      }
+
+      await _firestore.collection('users').doc(_user!.uid).update(updates);
+
+      // Update local user data
+      _userData!.addAll(updates);
+      _appUser = AppUser.fromJson(_userData!);
+
+      // Update Firebase Authentication displayName if changed
+      if (updates.containsKey('displayName')) {
+        await _user!.updateDisplayName(updates['displayName']);
+      }
+
+      // Notify listeners about the changes
+      notifyListeners();
+    } catch (e) {
+      _errorMessage = "Error updating user data: $e";
+      notifyListeners();
+      throw Exception("Failed to update user data: $e");
     }
   }
 
@@ -156,7 +211,7 @@ class AppAuthProvider extends ChangeNotifier {
       );
 
       if (userCredential.additionalUserInfo?.isNewUser ?? false) {
-        await _createUserDocument(userCredential.user!, 'user');
+        await _createUserDocument(_generateRandomUsername(), userCredential.user!, 'user');
       }
 
       return userCredential;
@@ -195,12 +250,10 @@ class AppAuthProvider extends ChangeNotifier {
     }
   }
 
-  // Password reset
   Future<void> resetPassword(String email) async {
     await _auth.sendPasswordResetEmail(email: email);
   }
 
-  // Check if welcome screen should be shown
   bool shouldShowWelcomeScreen() {
     return _user == null;
   }
@@ -209,4 +262,12 @@ class AppAuthProvider extends ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
   }
+
+  String _generateRandomUsername() {
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    final random = Random();
+    return List.generate(10, (index) => chars[random.nextInt(chars.length)]).join();
+  }
+
 }
+

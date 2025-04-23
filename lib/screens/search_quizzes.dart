@@ -2,27 +2,33 @@ import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:go_router/go_router.dart';
 import 'package:learn_hub/configs/router_config.dart';
+import 'package:learn_hub/const/search_quiz_config.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
-class SearchQuizzesScreen extends StatefulWidget {
-  final String title;
-  final Map<String, dynamic> filterParams;
-  final IconData? icon;
-  final Color? iconColor;
+class SearchQuizzesExtra {
+  final Widget title;
+  final SearchQuizConfig searchConfig;
+  final bool? showSearchBar;
 
-  const SearchQuizzesScreen({
-    super.key,
+  SearchQuizzesExtra({
     required this.title,
-    required this.filterParams,
-    this.icon,
-    this.iconColor,
+    required this.searchConfig,
+    this.showSearchBar,
   });
+}
+
+class SearchQuizzesScreen extends StatefulWidget {
+  final SearchQuizzesExtra searchExtra;
+
+  const SearchQuizzesScreen({super.key, required this.searchExtra});
 
   @override
   State<SearchQuizzesScreen> createState() => _SearchQuizzesScreenState();
 }
 
 class _SearchQuizzesScreenState extends State<SearchQuizzesScreen> {
+  final TextEditingController _searchController = TextEditingController();
+  late ColorScheme cs = Theme.of(context).colorScheme;
   bool _isLoading = true;
   String? _error;
   List<Map<String, dynamic>> _quizzes = [];
@@ -31,6 +37,26 @@ class _SearchQuizzesScreenState extends State<SearchQuizzesScreen> {
   void initState() {
     super.initState();
     _fetchQuizzes();
+    if (widget.searchExtra.showSearchBar ?? false) {
+      _searchController.text = widget.searchExtra.searchConfig.searchText!;
+      _searchController.addListener(() {
+        setState(() {
+          _quizzes = _getMockQuizzesBySearch(_searchController.text);
+        });
+      });
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    cs = Theme.of(context).colorScheme;
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _fetchQuizzes() async {
@@ -43,23 +69,7 @@ class _SearchQuizzesScreenState extends State<SearchQuizzesScreen> {
       // Simulate API call with delay
       await Future.delayed(const Duration(seconds: 1));
 
-      // TODO: Replace with actual API call
-      // Here we're using the filterParams to simulate different results
-      if (widget.filterParams.containsKey('mockData')) {
-        _quizzes = widget.filterParams['mockData'];
-      } else if (widget.filterParams.containsKey('category')) {
-        _quizzes = _getMockQuizzesByCategory(widget.filterParams['category']);
-      } else if (widget.filterParams.containsKey('difficulty')) {
-        _quizzes = _getMockQuizzesByDifficulty(widget.filterParams['difficulty']);
-      } else if (widget.filterParams.containsKey('query')) {
-        _quizzes = _getMockQuizzesBySearch(widget.filterParams['query']);
-      } else if (widget.filterParams.containsKey('recent')) {
-        _quizzes = _getMockRecentQuizzes();
-      } else if (widget.filterParams.containsKey('favorite')) {
-        _quizzes = _getMockFavoriteQuizzes();
-      } else {
-        _quizzes = _getMockAllQuizzes();
-      }
+      _quizzes = _getMockAllQuizzes();
 
       setState(() {
         _isLoading = false;
@@ -74,27 +84,9 @@ class _SearchQuizzesScreenState extends State<SearchQuizzesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-
     return Scaffold(
       appBar: AppBar(
-        title: Row(
-          children: [
-            if (widget.icon != null)
-              Padding(
-                padding: const EdgeInsets.only(right: 8.0),
-                child: Icon(widget.icon, size: 20, color: widget.iconColor ?? cs.primary),
-              ),
-            Text(
-              widget.title,
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 18,
-                fontFamily: 'BricolageGrotesque',
-              ),
-            ),
-          ],
-        ),
+        title: (widget.searchExtra.title),
         actions: [
           IconButton(
             icon: const Icon(PhosphorIconsRegular.sliders),
@@ -106,7 +98,7 @@ class _SearchQuizzesScreenState extends State<SearchQuizzesScreen> {
         ],
         centerTitle: false,
       ),
-      body: _buildBody(cs),
+      body: _buildBody(),
       floatingActionButton: FloatingActionButton(
         onPressed: () => context.pushNamed(AppRoute.generateQuiz.name),
         tooltip: 'Create Quiz',
@@ -115,9 +107,15 @@ class _SearchQuizzesScreenState extends State<SearchQuizzesScreen> {
     );
   }
 
-  Widget _buildBody(ColorScheme cs) {
+  Widget _buildBody() {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return Column(
+        children: [
+          if (widget.searchExtra.showSearchBar ?? false)
+            _buildSearchBar(),
+          Expanded(child: const Center(child: CircularProgressIndicator())),
+        ],
+      );
     }
 
     if (_error != null) {
@@ -133,10 +131,7 @@ class _SearchQuizzesScreenState extends State<SearchQuizzesScreen> {
             const SizedBox(height: 16),
             Text(
               _error!,
-              style: TextStyle(
-                fontSize: 16,
-                color: cs.onSurfaceVariant,
-              ),
+              style: TextStyle(fontSize: 16, color: cs.onSurfaceVariant),
             ),
             const SizedBox(height: 24),
             ElevatedButton.icon(
@@ -150,177 +145,217 @@ class _SearchQuizzesScreenState extends State<SearchQuizzesScreen> {
     }
 
     if (_quizzes.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              PhosphorIconsRegular.clipboard,
-              size: 64,
-              color: cs.onSurfaceVariant.withValues(alpha: 0.3),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'No quizzes found',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w500,
-                color: cs.onSurfaceVariant,
-              ),
-            ),
-            if (widget.filterParams.containsKey('query'))
-              Padding(
-                padding: const EdgeInsets.only(top: 8.0),
-                child: Text(
-                  'Try using different search terms',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: cs.onSurfaceVariant.withValues(alpha: 0.7),
+      return Column(
+        children: [
+          if (widget.searchExtra.showSearchBar ?? false)
+            _buildSearchBar(),
+          Expanded(
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    PhosphorIconsRegular.clipboard,
+                    size: 64,
+                    color: cs.onSurfaceVariant.withValues(alpha: 0.3),
                   ),
-                ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No quizzes found',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w500,
+                      color: cs.onSurfaceVariant,
+                    ),
+                  ),
+                ],
               ),
-          ],
-        ),
+            ),
+          ),
+        ],
       );
     }
 
-    return RefreshIndicator(
-      onRefresh: _fetchQuizzes,
-      child: AnimationLimiter(
-        child: ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: _quizzes.length,
-          physics: const AlwaysScrollableScrollPhysics(
-            parent: BouncingScrollPhysics(),
-          ),
-          itemBuilder: (context, index) {
-            final quiz = _quizzes[index];
-            return AnimationConfiguration.staggeredList(
-              position: index,
-              duration: const Duration(milliseconds: 400),
-              child: SlideAnimation(
-                horizontalOffset: 50,
-                child: FadeInAnimation(
-                  child: _buildQuizCard(context, quiz),
+    return Column(
+      children: [
+        if (widget.searchExtra.showSearchBar ?? false)
+          _buildSearchBar(),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: _fetchQuizzes,
+            child: AnimationLimiter(
+              child: ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: _quizzes.length,
+                physics: const AlwaysScrollableScrollPhysics(
+                  parent: BouncingScrollPhysics(),
                 ),
+                itemBuilder: (context, index) {
+                  final quiz = _quizzes[index];
+                  return AnimationConfiguration.staggeredList(
+                    position: index,
+                    duration: const Duration(milliseconds: 400),
+                    child: SlideAnimation(
+                      horizontalOffset: 50,
+                      child: FadeInAnimation(child: _buildQuizCard(context, quiz)),
+                    ),
+                  );
+                },
               ),
-            );
-          },
+            ),
+          ),
         ),
-      ),
+      ],
     );
   }
 
   void _showFilterBottomSheet() {
-    final cs = Theme.of(context).colorScheme;
-
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: cs.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: cs.onSurface.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(2),
-                ),
+      builder:
+          (context) => Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: cs.surface,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(20),
               ),
             ),
-            const SizedBox(height: 20),
-            Text(
-              "Filter Quizzes",
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: cs.onSurface,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              "Difficulty",
-              style: TextStyle(fontWeight: FontWeight.w500, color: cs.onSurface),
-            ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildFilterChip(cs, "Easy", true),
-                _buildFilterChip(cs, "Medium", false),
-                _buildFilterChip(cs, "Hard", false),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Text(
-              "Categories",
-              style: TextStyle(fontWeight: FontWeight.w500, color: cs.onSurface),
-            ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              children: [
-                _buildFilterChip(cs, "Science", true),
-                _buildFilterChip(cs, "Math", false),
-                _buildFilterChip(cs, "Language", false),
-                _buildFilterChip(cs, "History", false),
-              ],
-            ),
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                    },
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      side: BorderSide(color: cs.primary),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: cs.onSurface.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(2),
                     ),
-                    child: Text("Reset", style: TextStyle(color: cs.primary)),
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: FilledButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      _fetchQuizzes();
-                    },
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      backgroundColor: cs.primary,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: Text("Apply", style: TextStyle(color: cs.onPrimary)),
+                const SizedBox(height: 20),
+                Text(
+                  "Filter Quizzes",
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: cs.onSurface,
                   ),
                 ),
+                const SizedBox(height: 16),
+                Text(
+                  "Difficulty",
+                  style: TextStyle(
+                    fontWeight: FontWeight.w500,
+                    color: cs.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    _buildFilterChip("Easy", true),
+                    _buildFilterChip("Medium", false),
+                    _buildFilterChip("Hard", false),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  "Categories",
+                  style: TextStyle(
+                    fontWeight: FontWeight.w500,
+                    color: cs.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    _buildFilterChip("Science", true),
+                    _buildFilterChip("Math", false),
+                    _buildFilterChip("Language", false),
+                    _buildFilterChip("History", false),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                        },
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          side: BorderSide(color: cs.primary),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: Text(
+                          "Reset",
+                          style: TextStyle(color: cs.primary),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _fetchQuizzes();
+                        },
+                        style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          backgroundColor: cs.primary,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: Text(
+                          "Apply",
+                          style: TextStyle(color: cs.onPrimary),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: MediaQuery.of(context).padding.bottom),
               ],
             ),
-            SizedBox(height: MediaQuery.of(context).padding.bottom),
-          ],
+          ),
+    );
+  }
+
+  Widget _buildSearchBar() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+      child: TextField(
+        controller: _searchController,
+        onChanged: (value) {
+          setState(() {
+            _quizzes = _getMockQuizzesBySearch(value);
+          });
+        },
+        decoration: InputDecoration(
+          hintText: "Search quizzes...",
+          prefixIcon: Icon(PhosphorIconsRegular.magnifyingGlass),
+          filled: true,
+          fillColor: cs.surface,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildFilterChip(ColorScheme cs, String label, bool selected) {
+  Widget _buildFilterChip(String label, bool selected) {
     return FilterChip(
       label: Text(label),
       selected: selected,
@@ -337,7 +372,6 @@ class _SearchQuizzesScreenState extends State<SearchQuizzesScreen> {
   }
 
   Widget _buildQuizCard(BuildContext context, Map<String, dynamic> quiz) {
-    final cs = Theme.of(context).colorScheme;
     final diffColor = _getDifficultyColor(quiz['difficulty'], context);
 
     return Card(
@@ -353,25 +387,19 @@ class _SearchQuizzesScreenState extends State<SearchQuizzesScreen> {
             // For sample data, generate mock questions
             final mockQuestions = List.generate(
               quiz['questionCount'],
-                  (index) => {
-                'question': 'Sample question ${index + 1} for ${quiz['title']}?',
-                'options': [
-                  'Option A',
-                  'Option B',
-                  'Option C',
-                  'Option D'
-                ],
+              (index) => {
+                'question':
+                    'Sample question ${index + 1} for ${quiz['title']}?',
+                'options': ['Option A', 'Option B', 'Option C', 'Option D'],
                 'answer': index % 4,
-                'explanation': 'This is the explanation for question ${index + 1}.'
+                'explanation':
+                    'This is the explanation for question ${index + 1}.',
               },
             );
 
             context.pushNamed(
               AppRoute.doQuizzes.name,
-              extra: {
-                'quizzes': mockQuestions,
-                'prevRoute': null,
-              },
+              extra: {'quizzes': mockQuestions, 'prevRoute': null},
             );
           } else {
             // If it's already a quiz with questions format
@@ -496,7 +524,7 @@ class _SearchQuizzesScreenState extends State<SearchQuizzesScreen> {
   }
 
   Color _getDifficultyColor(dynamic difficulty, BuildContext context) {
-    if (difficulty == null) return Theme.of(context).colorScheme.primary;
+    if (difficulty == null) return cs.primary;
     return difficulty == 'Easy'
         ? Colors.green
         : difficulty == 'Medium'
@@ -508,13 +536,25 @@ class _SearchQuizzesScreenState extends State<SearchQuizzesScreen> {
   List<Map<String, dynamic>> _getMockAllQuizzes() {
     return List.generate(
       10,
-          (index) => {
+      (index) => {
         'id': 'quiz_$index',
         'title': 'Quiz ${index + 1}',
         'description': 'This is a sample quiz with random questions',
-        'difficulty': index % 3 == 0 ? 'Easy' : index % 3 == 1 ? 'Medium' : 'Hard',
+        'difficulty':
+            index % 3 == 0
+                ? 'Easy'
+                : index % 3 == 1
+                ? 'Medium'
+                : 'Hard',
         'questionCount': 10 + index,
-        'tag': index % 4 == 0 ? 'Science' : index % 4 == 1 ? 'Math' : index % 4 == 2 ? 'Language' : 'History',
+        'tag':
+            index % 4 == 0
+                ? 'Science'
+                : index % 4 == 1
+                ? 'Math'
+                : index % 4 == 2
+                ? 'Language'
+                : 'History',
       },
     );
   }
@@ -522,11 +562,16 @@ class _SearchQuizzesScreenState extends State<SearchQuizzesScreen> {
   List<Map<String, dynamic>> _getMockQuizzesByCategory(String category) {
     return List.generate(
       5,
-          (index) => {
+      (index) => {
         'id': '${category.toLowerCase()}_$index',
         'title': '$category Quiz ${index + 1}',
         'description': 'Quiz related to $category',
-        'difficulty': index % 3 == 0 ? 'Easy' : index % 3 == 1 ? 'Medium' : 'Hard',
+        'difficulty':
+            index % 3 == 0
+                ? 'Easy'
+                : index % 3 == 1
+                ? 'Medium'
+                : 'Hard',
         'questionCount': 8 + index,
         'tag': category,
       },
@@ -536,13 +581,25 @@ class _SearchQuizzesScreenState extends State<SearchQuizzesScreen> {
   List<Map<String, dynamic>> _getMockQuizzesByDifficulty(String difficulty) {
     return List.generate(
       5,
-          (index) => {
+      (index) => {
         'id': '${difficulty.toLowerCase()}_$index',
         'title': '$difficulty Level Quiz ${index + 1}',
         'description': 'A $difficulty difficulty quiz',
         'difficulty': difficulty,
-        'questionCount': difficulty == 'Easy' ? 5 + index : difficulty == 'Medium' ? 10 + index : 15 + index,
-        'tag': index % 4 == 0 ? 'Science' : index % 4 == 1 ? 'Math' : index % 4 == 2 ? 'Language' : 'History',
+        'questionCount':
+            difficulty == 'Easy'
+                ? 5 + index
+                : difficulty == 'Medium'
+                ? 10 + index
+                : 15 + index,
+        'tag':
+            index % 4 == 0
+                ? 'Science'
+                : index % 4 == 1
+                ? 'Math'
+                : index % 4 == 2
+                ? 'Language'
+                : 'History',
       },
     );
   }
@@ -550,21 +607,36 @@ class _SearchQuizzesScreenState extends State<SearchQuizzesScreen> {
   List<Map<String, dynamic>> _getMockQuizzesBySearch(String query) {
     // Simple mock implementation that returns quizzes that contain the query in title
     final allQuizzes = _getMockAllQuizzes();
-    return allQuizzes.where((quiz) =>
-    quiz['title'].toString().toLowerCase().contains(query.toLowerCase()) ||
-        quiz['description'].toString().toLowerCase().contains(query.toLowerCase()) ||
-        quiz['tag'].toString().toLowerCase().contains(query.toLowerCase())
-    ).toList();
+    return allQuizzes
+        .where(
+          (quiz) =>
+              quiz['title'].toString().toLowerCase().contains(
+                query.toLowerCase(),
+              ) ||
+              quiz['description'].toString().toLowerCase().contains(
+                query.toLowerCase(),
+              ) ||
+              quiz['tag'].toString().toLowerCase().contains(
+                query.toLowerCase(),
+              ),
+        )
+        .toList();
   }
 
   List<Map<String, dynamic>> _getMockRecentQuizzes() {
     return List.generate(
       5,
-          (index) => {
+      (index) => {
         'id': 'recent_$index',
         'title': 'Recent Quiz ${index + 1}',
-        'description': 'Created on ${DateTime.now().subtract(Duration(days: index)).toString().substring(0, 10)}',
-        'difficulty': index % 3 == 0 ? 'Easy' : index % 3 == 1 ? 'Medium' : 'Hard',
+        'description':
+            'Created on ${DateTime.now().subtract(Duration(days: index)).toString().substring(0, 10)}',
+        'difficulty':
+            index % 3 == 0
+                ? 'Easy'
+                : index % 3 == 1
+                ? 'Medium'
+                : 'Hard',
         'questionCount': 1,
         'tag': index % 2 == 0 ? 'Science' : 'Math',
       },
@@ -574,11 +646,17 @@ class _SearchQuizzesScreenState extends State<SearchQuizzesScreen> {
   List<Map<String, dynamic>> _getMockFavoriteQuizzes() {
     return List.generate(
       3,
-          (index) => {
+      (index) => {
         'id': 'fav_$index',
         'title': 'Favorite Quiz ${index + 1}',
-        'description': 'Last used: ${DateTime.now().subtract(Duration(days: index * 2)).toString().substring(0, 10)}',
-        'difficulty': index % 3 == 0 ? 'Easy' : index % 3 == 1 ? 'Medium' : 'Hard',
+        'description':
+            'Last used: ${DateTime.now().subtract(Duration(days: index * 2)).toString().substring(0, 10)}',
+        'difficulty':
+            index % 3 == 0
+                ? 'Easy'
+                : index % 3 == 1
+                ? 'Medium'
+                : 'Hard',
         'questionCount': 8 + index,
         'tag': index % 2 == 0 ? 'History' : 'Biology',
       },

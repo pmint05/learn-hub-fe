@@ -7,6 +7,7 @@ import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:learn_hub/const/header_action.dart';
 import 'package:learn_hub/providers/appbar_provider.dart';
 import 'package:learn_hub/services/ask_ai.dart';
+import 'package:learn_hub/utils/api_helper.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:provider/provider.dart';
 
@@ -17,6 +18,15 @@ enum LoadingState {
   final String message;
 
   const LoadingState(this.message);
+}
+
+class ContextFileInfo {
+  final String id;
+  final String? filename;
+  final String? extension;
+  final int? size;
+
+  ContextFileInfo({required this.id, this.filename, this.extension, this.size});
 }
 
 class Message {
@@ -36,12 +46,9 @@ class Message {
 }
 
 class AskScreen extends StatefulWidget {
-  final List<String>? materialIds;
+  final List<ContextFileInfo>? contextFiles;
 
-  const AskScreen({
-    super.key,
-    this.materialIds,
-  });
+  const AskScreen({super.key, this.contextFiles});
 
   @override
   State<AskScreen> createState() => _AskScreenState();
@@ -49,6 +56,7 @@ class AskScreen extends StatefulWidget {
 
 class _AskScreenState extends State<AskScreen> {
   final TextEditingController _textController = TextEditingController();
+  final FocusNode _inputFocusNode = FocusNode();
   final ScrollController _messageScrollController = ScrollController();
   final List<Message> _messages = [
     // Sample messages - remove or modify as needed
@@ -70,6 +78,7 @@ class _AskScreenState extends State<AskScreen> {
     // ),
   ];
 
+  List<ContextFileInfo>? _contextFiles;
   File? file;
   PlatformFile? selectedFileInfo;
 
@@ -84,11 +93,13 @@ class _AskScreenState extends State<AskScreen> {
       setState(() {});
     });
 
-    if (widget.materialIds != null && widget.materialIds!.isNotEmpty) {
-      print("Received materials: ${widget.materialIds}");
+    if (widget.contextFiles != null && widget.contextFiles!.isNotEmpty) {
+      print("Received materials: ${widget.contextFiles!.first.filename}");
       // Process the material IDs - perhaps load documents
       // _loadDocumentsById(widget.materialIds!);
     }
+
+    _contextFiles = widget.contextFiles ?? [];
   }
 
   void _showChatHistory() {
@@ -171,6 +182,7 @@ class _AskScreenState extends State<AskScreen> {
   void dispose() {
     _textController.dispose();
     _messageScrollController.dispose();
+    _inputFocusNode.dispose();
     super.dispose();
   }
 
@@ -230,13 +242,58 @@ class _AskScreenState extends State<AskScreen> {
             String taskId = res['task_id'];
 
             Timer.periodic(const Duration(seconds: 2), (timer) {
-              _aiService.checkStatus(taskId).then((response) {
+              checkTaskStatus(taskId).then((response) {
                 if (response['status'] == 'completed') {
-                  timer.cancel();
                   _queryMessage(message);
+                } else {
+                  setState(() {
+                    _isGettingResponse = false;
+                    _messages.removeAt(_messages.length - 1);
+                    _messages.add(
+                      Message(
+                        text: "Error: ${response['message']}",
+                        isUser: false,
+                        timestamp: DateTime.now(),
+                        isError: true,
+                      ),
+                    );
+                  });
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    _scrollToBottom();
+                  });
                 }
+                timer.cancel();
               });
             });
+          });
+        } else if (_contextFiles != null && _contextFiles!.isNotEmpty) {
+          final List<ContextFileInfo>? tmp = _contextFiles;
+          setState(() {
+            loadingState = LoadingState.generating;
+            _contextFiles = null;
+          });
+          _aiService.addContextFileToChat(tmp!).then((res) {
+            if (res['status'] != 'success') {
+              setState(() {
+                _isGettingResponse = false;
+                _messages.removeAt(_messages.length - 1);
+                _messages.add(
+                  Message(
+                    text:
+                        res['message'] ??
+                        "Error when adding file, try again later",
+                    isUser: false,
+                    timestamp: DateTime.now(),
+                    isError: true,
+                  ),
+                );
+              });
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                _scrollToBottom();
+              });
+              return;
+            }
+            _queryMessage(message);
           });
         } else {
           _queryMessage(message);
@@ -254,10 +311,10 @@ class _AskScreenState extends State<AskScreen> {
       String taskId = res['task_id'];
 
       Timer.periodic(const Duration(seconds: 2), (timer) {
-        _aiService
-            .checkStatus(taskId)
+        checkTaskStatus(taskId)
             .then((response) {
-              if (response['status'] == 'completed') {
+              if (response['status'] == 'completed' &&
+                  response['message'] != "Empty Response") {
                 timer.cancel();
                 setState(() {
                   _isGettingResponse = false;
@@ -270,10 +327,25 @@ class _AskScreenState extends State<AskScreen> {
                     ),
                   );
                 });
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  _scrollToBottom();
+              } else {
+                setState(() {
+                  _isGettingResponse = false;
+                  _messages.removeAt(_messages.length - 1);
+                  _messages.add(
+                    Message(
+                      text:
+                          "Sorry, I don't have enough information to answer your question.",
+                      isUser: false,
+                      timestamp: DateTime.now(),
+                      isError: true,
+                    ),
+                  );
                 });
               }
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                _scrollToBottom();
+                _inputFocusNode.requestFocus();
+              });
             })
             .catchError((error) {
               setState(() {
@@ -290,6 +362,7 @@ class _AskScreenState extends State<AskScreen> {
               });
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 _scrollToBottom();
+                _inputFocusNode.requestFocus();
               });
             });
       });
@@ -307,6 +380,8 @@ class _AskScreenState extends State<AskScreen> {
   }
 
   void _pickFile() async {
+    if (_contextFiles != null && _contextFiles!.isNotEmpty)
+      _contextFiles = null;
     FilePickerResult? result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['pdf', 'docx', 'doc', 'txt'],
@@ -348,9 +423,10 @@ class _AskScreenState extends State<AskScreen> {
               child: SlideAnimation(
                 verticalOffset: 50.0,
                 child: FadeInAnimation(
-                  child: _messages.isEmpty
-                      ? _buildEmptyState(cs)
-                      : _buildMessageList(cs),
+                  child:
+                      _messages.isEmpty
+                          ? _buildEmptyState(cs)
+                          : _buildMessageList(cs),
                 ),
               ),
             ),
@@ -503,48 +579,7 @@ class _AskScreenState extends State<AskScreen> {
             AnimatedSize(
               duration: const Duration(milliseconds: 200),
               curve: Curves.ease,
-              child:
-                  file != null && selectedFileInfo != null
-                      ? Container(
-                        padding: const EdgeInsets.all(8),
-                        margin: const EdgeInsets.only(bottom: 8),
-                        decoration: BoxDecoration(
-                          color: cs.primary.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.max,
-                          children: [
-                            Icon(
-                              PhosphorIconsRegular.fileText,
-                              color: cs.primary,
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                selectedFileInfo!.name,
-                                style: TextStyle(color: cs.onSurface),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            IconButton(
-                              icon: Icon(
-                                PhosphorIconsRegular.x,
-                                color: cs.primary,
-                              ),
-                              onPressed: () {
-                                setState(() {
-                                  file = null;
-                                  selectedFileInfo = null;
-                                });
-                              },
-                              padding: const EdgeInsets.all(4),
-                              constraints: const BoxConstraints(),
-                            ),
-                          ],
-                        ),
-                      )
-                      : Container()
+              child: _buildContextFileList(cs),
             ),
             Row(
               children: [
@@ -560,8 +595,8 @@ class _AskScreenState extends State<AskScreen> {
                 const SizedBox(width: 4),
                 Expanded(
                   child: TextField(
-                    enabled: !_isGettingResponse,
                     controller: _textController,
+                    focusNode: _inputFocusNode,
                     maxLines: 5,
                     minLines: 1,
                     decoration: InputDecoration(
@@ -569,7 +604,13 @@ class _AskScreenState extends State<AskScreen> {
                       hintStyle: TextStyle(color: placeholderColor),
                       border: InputBorder.none,
                     ),
-                    onSubmitted: (_) => _sendMessage(),
+                    onSubmitted: (_) {
+                      if (_textController.text.trim().isNotEmpty &&
+                          !_isGettingResponse) {
+                        _sendMessage();
+                      }
+                    },
+                    autofocus: true,
                   ),
                 ),
                 IconButton(
@@ -596,6 +637,51 @@ class _AskScreenState extends State<AskScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildContextFileList(ColorScheme cs) {
+    String name;
+    if (file != null && selectedFileInfo != null) {
+      name = selectedFileInfo!.name;
+    } else if (_contextFiles != null && _contextFiles!.isNotEmpty) {
+      name = _contextFiles!.first.filename ?? "File";
+    } else {
+      return const SizedBox.shrink();
+    }
+    return Container(
+      padding: const EdgeInsets.all(8),
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: cs.primary.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.max,
+        children: [
+          Icon(PhosphorIconsRegular.fileText, color: cs.primary),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              name,
+              style: TextStyle(color: cs.onSurface),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          IconButton(
+            icon: Icon(PhosphorIconsRegular.x, color: cs.primary),
+            onPressed: () {
+              setState(() {
+                file = null;
+                selectedFileInfo = null;
+                _contextFiles = null;
+              });
+            },
+            padding: const EdgeInsets.all(4),
+            constraints: const BoxConstraints(),
+          ),
+        ],
       ),
     );
   }

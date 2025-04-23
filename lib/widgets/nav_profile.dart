@@ -43,18 +43,26 @@ class ProfileIcon extends StatelessWidget {
         ),
         child: CircleAvatar(
           backgroundImage:
-              Uri.tryParse(profileURL)?.hasAbsolutePath == true
-                  ? NetworkImage(profileURL)
-                  : AssetImage(profileURL ?? 'assets/images/default_logo.png')
-                      as ImageProvider,
+              profileURL.isNotEmpty && profileURL.startsWith("http")
+                  ? Uri.tryParse(profileURL)?.hasAbsolutePath == true
+                      ? NetworkImage(profileURL)
+                      : AssetImage(
+                            profileURL ?? 'assets/images/default_logo.png',
+                          )
+                          as ImageProvider
+                  : AssetImage('assets/images/logo.png'),
           radius: 12,
-          child: profileURL.isEmpty
-              ? Icon(
-                  PhosphorIconsFill.user,
-                  color: isSelected ? cs.primary : cs.onSurface.withValues(alpha: 0.66),
-                  size: 24,
-                )
-              : null,
+          child:
+              profileURL.isEmpty
+                  ? Icon(
+                    PhosphorIconsFill.user,
+                    color:
+                        isSelected
+                            ? cs.primary
+                            : cs.onSurface.withValues(alpha: 0.66),
+                    size: 24,
+                  )
+                  : null,
         ),
       ),
     );

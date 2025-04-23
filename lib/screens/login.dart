@@ -17,6 +17,10 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  late final authProvider = Provider.of<AppAuthProvider>(
+    context,
+    listen: false,
+  );
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   bool _isPasswordVisible = false;
@@ -245,11 +249,6 @@ class _LoginScreenState extends State<LoginScreen> {
                                   // Validate form
                                   if (_formKey.currentState!.validate()) {
                                     try {
-                                      final authProvider =
-                                          Provider.of<AppAuthProvider>(
-                                            context,
-                                            listen: false,
-                                          );
                                       await authProvider.login(
                                         email: _emailController.text.trim(),
                                         password: _passwordController.text,

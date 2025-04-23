@@ -4,9 +4,19 @@ import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:learn_hub/screens/ask.dart';
+import 'package:learn_hub/utils/api_helper.dart';
 import 'package:path/path.dart';
 
 class AskAi {
+  static final AskAi instance = AskAi._internal();
+
+  factory AskAi() {
+    return instance;
+  }
+
+  AskAi._internal();
+
   final String baseUrl =
       dotenv.env['SERVER_API_URL'] ?? 'http://localhost:3000';
   final dio = Dio();
@@ -16,19 +26,6 @@ class AskAi {
 
   String message = "";
   File? file;
-
-  Future<Map<String, String>> _getAuthHeaders(String contentType) async {
-    final user = _auth.currentUser;
-    if (user == null) {
-      throw Exception('User not authenticated');
-    }
-
-    final token = await user.getIdToken();
-    return {
-      'Authorization': 'Bearer $token',
-      'Content-Type': contentType.isNotEmpty ? contentType : 'application/json',
-    };
-  }
 
   Future<Map<String, dynamic>> addFileToChat(
     File file,
@@ -52,11 +49,10 @@ class AskAi {
 
       print("FormData: ${data.fields}, files: ${data.files}");
 
-
       final response = await dio.post(
         '$baseUrl/add',
         data: data,
-        options: Options(headers: await _getAuthHeaders('multipart/form-data')),
+        options: Options(headers: await getAuthHeaders('multipart/form-data')),
         queryParameters: {'user_id': currentUserId, 'is_public': false},
       );
 
@@ -85,7 +81,7 @@ class AskAi {
           'query_text': message,
           'user_id': currentUserId,
         }),
-        options: Options(headers: await _getAuthHeaders('multipart/form-data')),
+        options: Options(headers: await getAuthHeaders('multipart/form-data')),
       );
 
       print(response);
@@ -102,22 +98,26 @@ class AskAi {
     }
   }
 
-  Future<Map<String, dynamic>> checkStatus(String taskId) async {
+  Future<Map<String, dynamic>> addContextFileToChat(
+    List<ContextFileInfo> contextFiles,
+  ) async {
     try {
-      final response = await dio.get(
-        '$baseUrl/status/$taskId',
-        options: Options(headers: await _getAuthHeaders('application/json')),
+      print("Adding context: $context, by user: $currentUserId");
+      final response = await dio.post(
+        '$baseUrl/document/pinecone/${contextFiles.first.id}',
+        data: {},
+        options: Options(headers: await getAuthHeaders('application/json')),
       );
 
+      print(response);
       if (response.statusCode == 200) {
-        print("Status checked successfully");
         return response.data;
       } else {
-        print("Failed to check status: ${response.statusCode}");
-        throw Exception('Failed to check status');
+        print("Failed to add context: ${response.statusCode}");
+        throw Exception('Failed to add context');
       }
     } catch (e) {
-      print('Error checking status: $e');
+      print('Error adding context: $e');
       return {'error': e.toString()};
     }
   }

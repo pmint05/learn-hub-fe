@@ -7,6 +7,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:learn_hub/const/quizzes_generator_config.dart';
 import 'package:learn_hub/const/quizzes_task.dart';
+import 'package:learn_hub/utils/api_helper.dart';
 
 // Add correct path import for file name handling
 import 'package:path/path.dart' show basename;
@@ -54,20 +55,7 @@ class QuizzesGenerator {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('current_quizzes_task');
   }
-
-  Future<Map<String, String>> _getAuthHeaders(String contentType) async {
-    final user = _auth.currentUser;
-    if (user == null) {
-      throw Exception('User not authenticated');
-    }
-
-    final token = await user.getIdToken();
-    return {
-      'Authorization': 'Bearer $token',
-      'Content-Type': contentType.isNotEmpty ? contentType : 'application/json',
-    };
-  }
-
+  
   Future<QuizzesTask> createQuizzesTask({
     required QuizzesGeneratorConfig config,
     File? file,
@@ -92,14 +80,24 @@ class QuizzesGenerator {
           onProgress,
         );
       case QuizzesSource.text:
-        // TODO: Handle this case.
-        throw UnimplementedError();
+        return await _createQuizzesTaskFromText(
+          text,
+          config,
+          onProgress,
+        );
       case QuizzesSource.image:
-        // TODO: Handle this case.
-        throw UnimplementedError();
+        return await _createQuizzesTaskFromFile(
+          file,
+          fileInfo,
+          config,
+          onProgress,
+        );
       case QuizzesSource.link:
-        // TODO: Handle this case.
-        throw UnimplementedError();
+        return await _createQuizzesTaskFromLink(
+          url,
+          config,
+          onProgress,
+        );
     }
   }
 
@@ -111,7 +109,7 @@ class QuizzesGenerator {
   ) async {
     onProgress?.call(0.1, "Reading file");
 
-    final headers = await _getAuthHeaders('multipart/form-data');
+    final headers = await getAuthHeaders('multipart/form-data');
 
     Uint8List fileBytes;
     String fileName;
@@ -192,36 +190,125 @@ class QuizzesGenerator {
     }
   }
 
-  Future<String> checkTaskStatus(String taskId) async {
+  Future<QuizzesTask> _createQuizzesTaskFromText(
+    String? text,
+    QuizzesGeneratorConfig config,
+    Function(double, String)? onProgress,
+  ) async {
+    if (text == null || text.isEmpty) {
+      throw Exception('No text provided');
+    }
+
+    final headers = await getAuthHeaders('application/json');
+
+    final params = {
+      'type': config.type.name.toLowerCase(),
+      'mode': config.mode.name.toLowerCase(),
+      'difficulty': config.difficulty.name.toLowerCase(),
+      'count': config.numberOfQuiz.toString(),
+      'lang': config.language.name.toLowerCase(),
+      if (currentUserId != null && currentUserId!.isNotEmpty)
+        'user_id': currentUserId!,
+      'is_public': true,
+    };
+
     try {
-      final headers = await _getAuthHeaders('application/json');
-      final response = await dio.get(
-        '$baseUrl/status/$taskId',
+      onProgress?.call(0.1, "Processing text");
+
+      final response = await dio.post(
+        '$baseUrl/generate/text',
+        data: {
+          'text': text,
+          ...params
+        },
+        // queryParameters: params,
         options: Options(headers: headers),
       );
 
+      onProgress?.call(0.9, "Processing response");
+
       if (response.statusCode == 200) {
-        final status = response.data['status'];
-        if (_currentTask != null && _currentTask!.taskId == taskId) {
-          if (status == 'error') {
-            final errorMessage = response.data['message'] ?? 'Unknown error';
-            _currentTask?.errorMessage = errorMessage;
-          }
-          _currentTask!.status = status;
-          await _saveCurrentTask();
-        }
-        return status;
+        final taskId = response.data['task_id'];
+        final status = response.data['status'] ?? 'pending';
+
+        _currentTask = QuizzesTask(
+          taskId: taskId,
+          createdAt: DateTime.now(),
+          config: config,
+          status: status,
+        );
+
+        await _saveCurrentTask();
+        return _currentTask!;
       } else {
-        throw Exception('Failed to check status: ${response.statusCode}');
+        throw Exception('Failed to create task: ${response.statusCode}');
       }
     } catch (e) {
-      throw Exception('Error checking task status: $e');
+      throw Exception('Error creating task from text: $e');
+    }
+  }
+
+  Future<QuizzesTask> _createQuizzesTaskFromLink(
+    String? url,
+    QuizzesGeneratorConfig config,
+    Function(double, String)? onProgress,
+  ) async {
+    if (url == null || url.isEmpty) {
+      throw Exception('No URL provided');
+    }
+
+    final headers = await getAuthHeaders('application/json');
+
+    final params = {
+      'type': config.type.name.toLowerCase(),
+      'mode': config.mode.name.toLowerCase(),
+      'difficulty': config.difficulty.name.toLowerCase(),
+      'count': config.numberOfQuiz.toString(),
+      'lang': config.language.name.toLowerCase(),
+      if (currentUserId != null && currentUserId!.isNotEmpty)
+        'user_id': currentUserId!,
+      'is_public': true,
+    };
+
+    try {
+      onProgress?.call(0.1, "Processing URL");
+
+      final response = await dio.post(
+        '$baseUrl/generate/link',
+        data: {
+          'link': url,
+          ...params
+        },
+        // queryParameters: params,
+        options: Options(headers: headers),
+      );
+
+      onProgress?.call(0.9, "Processing response");
+
+      if (response.statusCode == 200) {
+        final taskId = response.data['task_id'];
+        final status = response.data['status'] ?? 'pending';
+
+        _currentTask = QuizzesTask(
+          taskId: taskId,
+          createdAt: DateTime.now(),
+          config: config,
+          status: status,
+        );
+
+        await _saveCurrentTask();
+        return _currentTask!;
+      } else {
+        throw Exception('Failed to create task: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error creating task from link: $e');
     }
   }
 
   Future<List<Map<String, dynamic>>> getTaskResult(String taskId) async {
     try {
-      final headers = await _getAuthHeaders('application/json');
+      final headers = await getAuthHeaders('application/json');
       final response = await dio.get(
         '$baseUrl/status/$taskId',
         options: Options(headers: headers),
@@ -259,6 +346,19 @@ class QuizzesGenerator {
     await _loadCurrentTask();
   }
 
+  Future<void> checkCurrentTaskStatus() async {
+    if (_currentTask == null) {
+      throw Exception('No current task found');
+    }
+
+    final status = await checkTaskStatus(_currentTask!.taskId);
+    _currentTask!.status = status['status'] ?? 'pending';
+    _currentTask!.errorMessage = status['status'] == 'error'
+        ? status['message']
+        : '';
+    await _saveCurrentTask();
+  }
+
   Future<List<Map<String, dynamic>>> generateQuizzes({
     required QuizzesGeneratorConfig config,
     File? file,
@@ -280,7 +380,7 @@ class QuizzesGenerator {
     String status = task.status;
     while (status != 'completed' && status != 'failed') {
       await Future.delayed(const Duration(seconds: 2));
-      status = await checkTaskStatus(task.taskId);
+      status = (await checkTaskStatus(task.taskId))['status'] ?? 'pending';
       onProgress?.call(0.95, "Waiting for processing completion... $status");
     }
 

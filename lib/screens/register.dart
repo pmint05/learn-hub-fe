@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:learn_hub/const/constants.dart';
 import 'package:learn_hub/providers/app_auth_provider.dart';
+import 'package:learn_hub/services/db.dart';
+import 'package:learn_hub/utils/helpers.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:learn_hub/screens/login.dart';
@@ -15,15 +17,24 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
+  late final authProvider = Provider.of<AppAuthProvider>(
+    context,
+    listen: false,
+  );
+
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController =
       TextEditingController();
 
+  final Debouncer _debouncer = Debouncer();
+
   bool _isPasswordVisible = false;
   bool _isLoading = false;
+  bool _isCheckingUsername = false;
 
+  String? _usernameError;
   String? _emailError;
   String? _passwordError;
   String? _confirmPasswordError;
@@ -33,6 +44,63 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   final _formKey = GlobalKey<FormState>();
+
+  @override
+  void initState() {
+    super.initState();
+    _usernameController.addListener(_onUsernameChanged);
+  }
+
+  @override
+  void dispose() {
+    _debouncer.cancel();
+    _usernameController.removeListener(_onUsernameChanged);
+    _usernameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
+  }
+
+  void _onUsernameChanged() {
+    final username = _usernameController.text;
+    if (username.isEmpty) {
+      setState(() {
+        _usernameError = null;
+      });
+      return;
+    }
+
+    if (username.length < 5 || !usernameRegex.hasMatch(username)) {
+      setState(() => _usernameError = 'Username must be at least 5 characters (letters, numbers, underscore)');
+      return;
+    }
+
+    setState(() {
+      _usernameError = null;
+      _isCheckingUsername = true;
+    });
+    _debouncer.run(() async {
+      try {
+        final exists = await DB.instance.checkUsernameExist(username);
+        print("Username exists: $exists");
+        if (mounted) {
+          setState(() {
+            _isCheckingUsername = false;
+            if (exists) {
+              _usernameError = 'Username already taken';
+            }
+          });
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() {
+            _isCheckingUsername = false;
+          });
+        }
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -89,6 +157,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 PhosphorIconsRegular.user,
                                 color: cs.onSurface.withValues(alpha: 0.8),
                               ),
+                              suffixIcon: _isCheckingUsername
+                                  ? SizedBox(
+                                width: 12,
+                                height: 12,
+                                child: CircularProgressIndicator(
+                                  constraints: BoxConstraints(
+                                    maxWidth: 12,
+                                    maxHeight: 12,
+                                  ),
+                                  strokeWidth: 2,
+                                  color: cs.primary,
+                                ),
+                              )
+                                  : _usernameError == null && _usernameController.text.isNotEmpty
+                                  ? Icon(
+                                PhosphorIconsRegular.check,
+                                color: Colors.green,
+                              )
+                                  : null,
                               filled: true,
                               fillColor: cs.surface,
                               enabledBorder: OutlineInputBorder(
@@ -104,6 +191,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 ),
                                 borderRadius: BorderRadius.circular(12),
                               ),
+                              errorBorder: OutlineInputBorder(
+                                borderSide: BorderSide(
+                                  color: Colors.red,
+                                  width: 1,
+                                ),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              focusedErrorBorder: OutlineInputBorder(
+                                borderSide: BorderSide(
+                                  color: Colors.red,
+                                  width: 1.5,
+                                ),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              errorText: _usernameError,
                             ),
                             style: TextStyle(color: cs.onSurface),
                           ),
@@ -344,12 +446,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                       setState(() {
                                         _isLoading = true;
                                       });
-                                      final authProvider =
-                                          Provider.of<AppAuthProvider>(
-                                            context,
-                                            listen: false,
-                                          );
                                       await authProvider.register(
+                                        username: _usernameController.text.trim(),
                                         email: _emailController.text.trim(),
                                         password: _passwordController.text,
                                       );

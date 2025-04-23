@@ -1,7 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
+import 'package:learn_hub/const/constants.dart';
 import 'package:learn_hub/configs/router_config.dart';
+import 'package:learn_hub/const/search_quiz_config.dart';
+import 'package:learn_hub/models/quiz.dart';
+import 'package:learn_hub/screens/search_quizzes.dart';
+import 'package:learn_hub/services/quiz_manager.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 final Map<String, PhosphorIconData> subjectCategories = {
@@ -23,7 +29,13 @@ final Map<String, PhosphorIconData> subjectCategories = {
   "Programming": PhosphorIconsRegular.code,
 };
 
-enum Difficulty { all, easy, medium, hard }
+final difficultyColors = {
+  'easy': Colors.green,
+  'medium': Colors.orange,
+  'hard': Colors.red,
+  'all': Colors.blue,
+  'unknown': Colors.grey,
+};
 
 class QuizzesScreen extends StatefulWidget {
   final List<Map<String, dynamic>>? quizList;
@@ -35,83 +47,176 @@ class QuizzesScreen extends StatefulWidget {
 }
 
 class _QuizzesScreenState extends State<QuizzesScreen> {
+  late ColorScheme cs = Theme.of(context).colorScheme;
   final TextEditingController _searchController = TextEditingController();
 
-  final recentQuizzes = List.generate(
-    5,
-    (index) => {
-      'id': 'quiz_$index',
-      'title': 'Quiz ${index + 1}',
-      'description':
-          'Created on ${DateTime.now().subtract(Duration(days: index)).toString().substring(0, 10)}',
-      'difficulty':
-          index % 3 == 0
-              ? 'Easy'
-              : index % 3 == 1
-              ? 'Medium'
-              : 'Hard',
-      'questionCount': 10 + index,
-      'tag': index % 2 == 0 ? 'Science' : 'Math',
-    },
-  );
+  List<Map<String, dynamic>> recentQuizzes = [];
+  List<Map<String, dynamic>> favoriteQuizzes = [];
+  Map<String, List<Map<String, dynamic>>> categoryQuizzes = {};
+  Map<String, List<Map<String, dynamic>>> difficultyQuizzes = {};
+  List<Map<String, dynamic>> first5Quizzes = [];
 
-  final favoriteQuizzes = List.generate(
-    3,
-    (index) => {
-      'id': 'fav_$index',
-      'title': 'Favorite Quiz ${index + 1}',
-      'description':
-          'Last used: ${DateTime.now().subtract(Duration(days: index * 2)).toString().substring(0, 10)}',
-      'difficulty':
-          index % 3 == 0
-              ? 'Easy'
-              : index % 3 == 1
-              ? 'Medium'
-              : 'Hard',
-      'questionCount': 8 + index,
-      'tag': index % 2 == 0 ? 'History' : 'Biology',
-    },
-  );
+  bool isLoadingRecent = true;
+  bool isLoadingFavorites = true;
+  bool isLoadingCategories = true;
+  bool isLoadingDifficulty = true;
 
-  final categoryQuizzes = {
-    'Science': List.generate(
-      3,
-      (index) => {
-        'id': 'sci_$index',
-        'title': 'Science Quiz ${index + 1}',
-        'description': 'Physics, Chemistry, Biology',
-        'difficulty':
-            index % 3 == 0
-                ? 'Easy'
-                : index % 3 == 1
-                ? 'Medium'
-                : 'Hard',
-        'questionCount': 12 + index,
-      },
-    ),
-    'Math': List.generate(
-      2,
-      (index) => {
-        'id': 'math_$index',
-        'title': 'Math Quiz ${index + 1}',
-        'description': 'Algebra, Geometry, Calculus',
-        'difficulty': index % 2 == 0 ? 'Easy' : 'Medium',
-        'questionCount': 15 + index,
-      },
-    ),
-    'Language': List.generate(
-      2,
-      (index) => {
-        'id': 'lang_$index',
-        'title': 'Language Quiz ${index + 1}',
-        'description': 'Grammar, Vocabulary, Writing',
-        'difficulty': index % 2 == 0 ? 'Medium' : 'Hard',
-        'questionCount': 20 + index,
-      },
-    ),
-  };
+  bool get isLoading =>
+      isLoadingRecent ||
+      isLoadingFavorites ||
+      isLoadingCategories ||
+      isLoadingDifficulty;
 
-  Difficulty selectedDifficulty = Difficulty.all;
+  DifficultyLevel selectedDifficultyLevel = DifficultyLevel.all;
+
+  Future<void> fetchAllQuizData() async {
+    fetchRecentQuizzes();
+    fetchFavoriteQuizzes();
+    fetchCategoryQuizzes();
+    fetchDifficultyQuizzes();
+  }
+
+  Future<List<Map<String, dynamic>>> fetchQuizzes({
+    required SearchQuizConfig config,
+    required String errorMessage,
+  }) async {
+    try {
+      final response = await QuizManager.instance.getQuizzes(config: config);
+      if (response['status'] == 'success' && response['data'] != null) {
+        return List<Map<String, dynamic>>.from(response['data']);
+      } else {
+        print("Error fetching quizzes: ${response['message']}");
+        print(response);
+        print(config.toJson());
+        return [];
+      }
+    } catch (e) {
+      print("$errorMessage: $e");
+      return [];
+    }
+  }
+
+  Future<void> fetchRecentQuizzes() async {
+    isLoadingRecent = true;
+    if (mounted) setState(() {});
+
+    final config = SearchQuizConfig(
+      searchText: "",
+      isPublic: true,
+      size: 5,
+      start: 0,
+      minCreatedDate: DateFormat(
+        'dd/MM/yyyy',
+      ).format(DateTime.now().subtract(const Duration(days: 30))),
+    );
+
+    recentQuizzes = await fetchQuizzes(
+      config: config,
+      errorMessage: "Error fetching recent quizzes",
+    );
+
+    isLoadingRecent = false;
+    if (mounted) setState(() {});
+  }
+
+  Future<void> fetchFavoriteQuizzes() async {
+    isLoadingFavorites = true;
+    if (mounted) setState(() {});
+
+    // Note: Assuming there's a way to filter favorite quizzes
+    // You might need to update this based on your backend API
+    final config = SearchQuizConfig(
+      searchText: "",
+      isPublic: false,
+      size: 5,
+      start: 0,
+    );
+
+    favoriteQuizzes = await fetchQuizzes(
+      config: config,
+      errorMessage: "Error fetching favorite quizzes",
+    );
+
+    isLoadingFavorites = false;
+    if (mounted) setState(() {});
+  }
+
+  Future<void> fetchCategoryQuizzes() async {
+    isLoadingCategories = true;
+    if (mounted) setState(() {});
+
+    categoryQuizzes = {};
+    final categories = ["Science", "Math", "Language"];
+
+    for (final category in categories) {
+      final config = SearchQuizConfig(
+        searchText: "",
+        isPublic: true,
+        size: 5,
+        start: 0,
+        categories: [category],
+      );
+
+      final quizzes = await fetchQuizzes(
+        config: config,
+        errorMessage: "Error fetching $category quizzes",
+      );
+
+      if (quizzes.isNotEmpty) {
+        categoryQuizzes[category] = quizzes;
+      }
+    }
+
+    isLoadingCategories = false;
+    if (mounted) setState(() {});
+  }
+
+  Future<void> fetchDifficultyQuizzes() async {
+    isLoadingDifficulty = true;
+    if (mounted) setState(() {});
+
+    difficultyQuizzes = {};
+    final difficulties = ["Easy", "Medium", "Hard"];
+
+    for (final difficulty in difficulties) {
+      final difficultyLevel =
+          difficulty == "Easy"
+              ? DifficultyLevel.easy
+              : difficulty == "Medium"
+              ? DifficultyLevel.medium
+              : DifficultyLevel.hard;
+
+      final config = SearchQuizConfig(
+        searchText: "",
+        isPublic: true,
+        size: 5,
+        start: 0,
+        difficulty: difficultyLevel,
+      );
+
+      final quizzes = await fetchQuizzes(
+        config: config,
+        errorMessage: "Error fetching $difficulty quizzes",
+      );
+
+      if (quizzes.isNotEmpty) {
+        difficultyQuizzes[difficulty] = quizzes;
+      }
+    }
+
+    isLoadingDifficulty = false;
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController.addListener(() {
+      final searchText = _searchController.text;
+      print("Searching for: $searchText");
+    });
+    fetchAllQuizData();
+  }
 
   @override
   void dispose() {
@@ -127,12 +232,11 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
       body: AnimationLimiter(
         child: Column(
           children: [
-            _buildSearchBar(cs),
+            _buildSearchBar(),
             Expanded(
               child: RefreshIndicator(
                 onRefresh: () async {
-                  // Implement quiz refresh logic
-                  await Future.delayed(const Duration(seconds: 1));
+                  await fetchAllQuizData();
                 },
                 child: ListView(
                   padding: const EdgeInsets.only(bottom: 120),
@@ -147,11 +251,11 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
                     children: [
                       if (widget.quizList != null &&
                           widget.quizList!.isNotEmpty)
-                        _buildNewlyGeneratedQuizzes(cs),
-                      _buildRecentQuizzes(cs),
-                      _buildFavoriteQuizzes(cs),
-                      _buildCategorizedQuizzes(cs),
-                      _buildDifficultyQuizzes(cs),
+                        _buildNewlyGeneratedQuizzes(),
+                      _buildRecentQuizzes(),
+                      _buildFavoriteQuizzes(),
+                      _buildCategorizedQuizzes(),
+                      _buildDifficultyLevelQuizzes(),
                     ],
                   ),
                 ),
@@ -278,10 +382,11 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
     );
   }
 
-  Widget _buildSearchBar(ColorScheme cs) {
+  Widget _buildSearchBar() {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
       child: Row(
+        spacing: 8,
         children: [
           Expanded(
             child: Container(
@@ -316,143 +421,39 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
               ),
             ),
           ),
-          IconButton(
+          ElevatedButton.icon(
+            style: ButtonStyle(
+              backgroundColor: WidgetStatePropertyAll(cs.primary),
+              padding: WidgetStatePropertyAll(EdgeInsets.symmetric(vertical: 12, horizontal: 20)),
+              shape: WidgetStatePropertyAll(
+                RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
             onPressed: () {
-              showModalBottomSheet(
-                context: context,
-                isScrollControlled: true,
-                backgroundColor: Colors.transparent,
-                builder: (context) => _buildFilterBottomSheet(cs),
+              context.pushNamed(
+                AppRoute.searchQuizzes.name,
+                extra: SearchQuizzesExtra(
+                  title: Text("Search"),
+                  searchConfig: SearchQuizConfig(
+                    searchText: _searchController.value.text,
+                    isPublic: false,
+                    size: 10,
+                    start: 0,
+                  ),
+                  showSearchBar: true,
+                ),
               );
             },
-            icon: Icon(PhosphorIconsRegular.sliders, color: cs.onSurface),
+            label: Text("Search"),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildFilterBottomSheet(ColorScheme cs) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: cs.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: cs.onSurface.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-          Text(
-            "Filter Quizzes",
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: cs.onSurface,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            "Difficulty",
-            style: TextStyle(fontWeight: FontWeight.w500, color: cs.onSurface),
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            children: [
-              _buildFilterChip(cs, "All", false),
-              _buildFilterChip(cs, "Easy", true),
-              _buildFilterChip(cs, "Medium", false),
-              _buildFilterChip(cs, "Hard", false),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            "Categories",
-            style: TextStyle(fontWeight: FontWeight.w500, color: cs.onSurface),
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            children: [
-              _buildFilterChip(cs, "Science", true),
-              _buildFilterChip(cs, "Math", false),
-              _buildFilterChip(cs, "Language", false),
-              _buildFilterChip(cs, "History", false),
-            ],
-          ),
-          const SizedBox(height: 24),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                  },
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    side: BorderSide(color: cs.primary),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: Text("Reset", style: TextStyle(color: cs.primary)),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: FilledButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                  },
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    backgroundColor: cs.primary,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: Text("Apply", style: TextStyle(color: cs.onPrimary)),
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: MediaQuery.of(context).padding.bottom),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFilterChip(ColorScheme cs, String label, bool selected) {
-    return FilterChip(
-      label: Text(label),
-      selected: selected,
-      onSelected: (value) {
-
-      },
-      backgroundColor: cs.surface,
-      selectedColor: cs.primary.withValues(alpha: 0.2),
-      labelStyle: TextStyle(color: selected ? cs.primary : cs.onSurfaceVariant),
-      checkmarkColor: cs.primary,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: selected ? cs.primary : Colors.transparent),
-      ),
-    );
-  }
-
-  Widget _buildNewlyGeneratedQuizzes(ColorScheme cs) {
+  Widget _buildNewlyGeneratedQuizzes() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -472,14 +473,18 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
               ),
               TextButton(
                 onPressed: () {
-                  context.pushNamed(AppRoute.searchQuizzes.name, extra: {
-                    'title': 'Generated Quizzes',
-                    'filterParams': {
-                      'difficulty': 'All',
-                      'categories': [],
-                    },
-                    'icon': PhosphorIconsRegular.sparkle,
-                  });
+                  context.pushNamed(
+                    AppRoute.searchQuizzes.name,
+                    extra: SearchQuizzesExtra(
+                      title: Text('Generated Quizzes'),
+                      searchConfig: SearchQuizConfig(
+                        searchText: "",
+                        isPublic: true,
+                        size: 5,
+                        start: 0,
+                      ),
+                    ),
+                  );
                 },
                 child: Text("View All", style: TextStyle(color: cs.primary)),
               ),
@@ -495,7 +500,7 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
             itemCount: widget.quizList!.length,
             itemBuilder: (context, index) {
               final quiz = widget.quizList![index];
-              return _buildGeneratedQuizCard(cs, quiz, index);
+              return _buildGeneratedQuizCard(quiz, index);
             },
           ),
         ),
@@ -503,11 +508,7 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
     );
   }
 
-  Widget _buildGeneratedQuizCard(
-    ColorScheme cs,
-    Map<String, dynamic> quiz,
-    int index,
-  ) {
+  Widget _buildGeneratedQuizCard(Map<String, dynamic> quiz, int index) {
     return GestureDetector(
       onTap: () {
         // Navigate to quiz detail or start quiz
@@ -622,7 +623,7 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
     );
   }
 
-  Widget _buildRecentQuizzes(ColorScheme cs) {
+  Widget _buildRecentQuizzes() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -644,11 +645,15 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
                 onPressed: () {
                   context.pushNamed(
                     AppRoute.searchQuizzes.name,
-                    extra: {
-                      'title': 'Recent Quizzes',
-                      'filterParams': {'recent': true},
-                      'icon': PhosphorIconsRegular.clockCounterClockwise,
-                    },
+                    extra: SearchQuizzesExtra(
+                      title: Text('Recent Quizzes'),
+                      searchConfig: SearchQuizConfig(
+                        searchText: "",
+                        isPublic: true,
+                        size: 5,
+                        start: 0,
+                      ),
+                    ),
                   );
                 },
                 child: Text("View All", style: TextStyle(color: cs.primary)),
@@ -658,121 +663,27 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
         ),
         SizedBox(
           height: 120,
-          child: ListView.builder(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
-            itemCount: recentQuizzes.length,
-            itemBuilder: (context, index) {
-              final quiz = recentQuizzes[index];
-              return _buildQuizCard(cs, quiz);
-            },
-          ),
+          child:
+              isLoadingRecent
+                  ? _buildLoadingIndicator()
+                  : recentQuizzes.isEmpty
+                  ? _buildEmptyState("No recent quizzes")
+                  : ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    scrollDirection: Axis.horizontal,
+                    physics: const BouncingScrollPhysics(),
+                    itemCount: recentQuizzes.length,
+                    itemBuilder: (context, index) {
+                      final quiz = recentQuizzes[index];
+                      return _buildQuizCard(quiz);
+                    },
+                  ),
         ),
       ],
     );
   }
 
-  Widget _buildQuizCard(ColorScheme cs, Map<String, dynamic> quiz) {
-    final diffColor =
-        quiz['difficulty'] == 'Easy'
-            ? Colors.green
-            : quiz['difficulty'] == 'Medium'
-            ? Colors.orange
-            : Colors.red;
-
-    return GestureDetector(
-      onTap: () {
-        // Navigate to quiz detail or start quiz
-      },
-      child: Container(
-        width: 200,
-        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-          color: cs.surface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: cs.surfaceDim),
-          boxShadow: [
-            BoxShadow(
-              color: cs.shadow.withValues(alpha: 0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                quiz['title'],
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                  color: cs.onSurface,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                quiz['description'],
-                style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const Spacer(),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: diffColor.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      quiz['difficulty'],
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: diffColor,
-                      ),
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: cs.surface,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: cs.surfaceDim),
-                    ),
-                    child: Text(
-                      "${quiz['questionCount']} Q",
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: cs.onSurfaceVariant,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFavoriteQuizzes(ColorScheme cs) {
+  Widget _buildFavoriteQuizzes() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -800,12 +711,25 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
                 onPressed: () {
                   context.pushNamed(
                     AppRoute.searchQuizzes.name,
-                    extra: {
-                      'title': 'Favorite Quizzes',
-                      'filterParams': {'favorite': true},
-                      'icon': PhosphorIconsFill.heart,
-                      'iconColor': Colors.red,
-                    },
+                    extra: SearchQuizzesExtra(
+                      title: Row(
+                        children: [
+                          Icon(
+                            PhosphorIconsFill.heart,
+                            size: 18,
+                            color: Colors.red,
+                          ),
+                          const SizedBox(width: 8),
+                          Text('Favorite Quizzes'),
+                        ],
+                      ),
+                      searchConfig: SearchQuizConfig(
+                        searchText: "",
+                        isPublic: false,
+                        size: 5,
+                        start: 0,
+                      ),
+                    ),
                   );
                 },
                 child: Text("View All", style: TextStyle(color: cs.primary)),
@@ -815,22 +739,27 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
         ),
         SizedBox(
           height: 120,
-          child: ListView.builder(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
-            itemCount: favoriteQuizzes.length,
-            itemBuilder: (context, index) {
-              final quiz = favoriteQuizzes[index];
-              return _buildQuizCard(cs, quiz);
-            },
-          ),
+          child:
+              isLoadingFavorites
+                  ? _buildLoadingIndicator()
+                  : favoriteQuizzes.isEmpty
+                  ? _buildEmptyState("No favorite quizzes")
+                  : ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    scrollDirection: Axis.horizontal,
+                    physics: const BouncingScrollPhysics(),
+                    itemCount: favoriteQuizzes.length,
+                    itemBuilder: (context, index) {
+                      final quiz = favoriteQuizzes[index];
+                      return _buildQuizCard(quiz);
+                    },
+                  ),
         ),
       ],
     );
   }
 
-  Widget _buildCategorizedQuizzes(ColorScheme cs) {
+  Widget _buildCategorizedQuizzes() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -854,7 +783,7 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
           itemBuilder: (context, index) {
             final category = categoryQuizzes.keys.elementAt(index);
             final quizList = categoryQuizzes[category]!;
-            return _buildCategorySection(cs, category, quizList);
+            return _buildCategorySection(category, quizList);
           },
         ),
       ],
@@ -862,7 +791,6 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
   }
 
   Widget _buildCategorySection(
-    ColorScheme cs,
     String category,
     List<Map<String, dynamic>> quizList,
   ) {
@@ -875,11 +803,11 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
         subjectCategories[category] ?? PhosphorIconsRegular.question,
         color: cs.primary,
       ),
-      children: quizList.map((quiz) => _buildQuizListItem(cs, quiz)).toList(),
+      children: quizList.map((quiz) => _buildQuizListItem(quiz)).toList(),
     );
   }
 
-  Widget _buildQuizListItem(ColorScheme cs, Map<String, dynamic> quiz) {
+  Widget _buildQuizListItem(Map<String, dynamic> quiz) {
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       title: Text(
@@ -914,14 +842,14 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
     );
   }
 
-  Widget _buildDifficultyQuizzes(ColorScheme cs) {
+  Widget _buildDifficultyLevelQuizzes() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
           child: Text(
-            "By Difficulty",
+            "By DifficultyLevel",
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
@@ -933,24 +861,21 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
         Row(
           children: [
             Expanded(
-              child: _buildDifficultyCard(
-                cs,
+              child: _buildDifficultyLevelCard(
                 "Easy",
                 Colors.green,
                 PhosphorIconsRegular.lightbulb,
               ),
             ),
             Expanded(
-              child: _buildDifficultyCard(
-                cs,
+              child: _buildDifficultyLevelCard(
                 "Medium",
                 Colors.orange,
                 PhosphorIconsRegular.puzzlePiece,
               ),
             ),
             Expanded(
-              child: _buildDifficultyCard(
-                cs,
+              child: _buildDifficultyLevelCard(
                 "Hard",
                 Colors.red,
                 PhosphorIconsRegular.brain,
@@ -962,12 +887,7 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
     );
   }
 
-  Widget _buildDifficultyCard(
-    ColorScheme cs,
-    String level,
-    Color color,
-    IconData icon,
-  ) {
+  Widget _buildDifficultyLevelCard(String level, Color color, IconData icon) {
     return Container(
       height: 120,
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -977,7 +897,7 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
       ),
       child: InkWell(
         onTap: () {
-          // Navigate to difficulty filtered quizList
+          // Navigate to DifficultyLevel filtered quizList
         },
         borderRadius: BorderRadius.circular(16),
         child: Column(
@@ -1002,6 +922,159 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildQuizCard(Map<String, dynamic> quiz) {
+    final diffColor =
+        difficultyColors[quiz['difficulty']?.toString().toLowerCase()] ??
+        difficultyColors['unknown']!;
+
+    return GestureDetector(
+      onTap: () {
+        if (mounted) {
+          context.pushNamed(
+            AppRoute.doQuizzes.name,
+            extra: {
+              'quiz': Quiz(
+                quizId: quiz['_id'],
+                createdBy: quiz['user_id'],
+                isPublic: quiz['is_public'],
+                numberOfQuestions: quiz['num_question'],
+                questions: quiz['questions'] ?? [],
+              ),
+              'prevRoute': AppRoute.quizzes,
+            },
+          );
+        }
+      },
+      child: Container(
+        width: 200,
+        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: cs.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: cs.surfaceDim),
+          boxShadow: [
+            BoxShadow(
+              color: cs.shadow.withValues(alpha: 0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                quiz['title'] ?? "Untitled Quiz",
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: cs.onSurface,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                quiz['description'] ?? "No description available",
+                style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const Spacer(),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: diffColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      quiz['DifficultyLevel'] ?? "Unknown",
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: diffColor,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: cs.surface,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: cs.surfaceDim),
+                    ),
+                    child: Text(
+                      "${quiz['num_question']} Q",
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLoadingIndicator() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          SizedBox(
+            width: 24,
+            height: 24,
+            child: CircularProgressIndicator(strokeWidth: 2, color: cs.primary),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            "Loading...",
+            style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(String message) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            PhosphorIconsRegular.fileX,
+            size: 24,
+            color: cs.onSurfaceVariant.withOpacity(0.5),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            message,
+            style: TextStyle(
+              fontSize: 12,
+              color: cs.onSurfaceVariant.withOpacity(0.7),
+            ),
+          ),
+        ],
       ),
     );
   }

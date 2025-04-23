@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:learn_hub/configs/router_keys.dart';
+import 'package:learn_hub/models/quiz.dart';
 import 'package:learn_hub/providers/app_auth_provider.dart';
 import 'package:learn_hub/screens/app.dart';
 import 'package:learn_hub/screens/do_quizzes.dart';
@@ -16,6 +17,7 @@ import 'package:learn_hub/screens/ask.dart';
 import 'package:learn_hub/screens/profile.dart';
 import 'package:learn_hub/screens/register.dart';
 import 'package:learn_hub/screens/search_quizzes.dart';
+import 'package:learn_hub/screens/settings.dart';
 import 'package:learn_hub/screens/welcome.dart';
 
 enum AppRoute {
@@ -90,10 +92,22 @@ GoRouter createRouter(AppAuthProvider authProvider) {
         parentNavigatorKey: rootNavigatorKey,
         pageBuilder: (context, state) {
           final params = state.extra as Map<String, dynamic>;
-          final quizzes = params['quizzes'] as List<Map<String, dynamic>>;
-          final prevRoute = params.containsKey('prevRoute') ? params['prevRoute'] as AppRoute? : null;
+          final quizzes =
+              params.containsKey('quizzes')
+                  ? params['quizzes'] as List<Map<String, dynamic>>
+                  : null;
+          final quiz =
+              params.containsKey('quiz') ? params['quiz'] as Quiz : null;
+          final prevRoute =
+              params.containsKey('prevRoute')
+                  ? params['prevRoute'] as AppRoute?
+                  : null;
           return MaterialPage(
-            child: DoQuizzesScreen(quizzes: quizzes, prevRoute: prevRoute),
+            child: DoQuizzesScreen(
+              quizzes: quizzes,
+              quiz: quiz,
+              prevRoute: prevRoute,
+            ),
           );
         },
       ),
@@ -131,15 +145,20 @@ GoRouter createRouter(AppAuthProvider authProvider) {
         name: AppRoute.searchQuizzes.name,
         parentNavigatorKey: rootNavigatorKey,
         pageBuilder: (context, state) {
-          final params = state.extra as Map<String, dynamic>;
           return MaterialPage(
             child: SearchQuizzesScreen(
-              title: params['title'],
-              filterParams: params['filterParams'],
-              icon: params['icon'],
-              iconColor: params['iconColor'],
+              searchExtra: state.extra as SearchQuizzesExtra,
             ),
           );
+        },
+      ),
+
+      GoRoute(
+        path: "/settings",
+        name: AppRoute.settings.name,
+        parentNavigatorKey: rootNavigatorKey,
+        pageBuilder: (context, state) {
+          return const MaterialPage(child: SettingsScreen());
         },
       ),
 
@@ -168,9 +187,13 @@ GoRouter createRouter(AppAuthProvider authProvider) {
             path: '/chat',
             name: AppRoute.chat.name,
             builder: (context, state) {
-              final materialIds = state.uri.queryParameters['materialIds']
-                  ?.split(',');
-              return AskScreen(materialIds: materialIds);
+              List<ContextFileInfo> contextFiles = [];
+              if (state.extra != null) {
+                contextFiles = state.extra as List<ContextFileInfo>;
+              } else {
+                contextFiles = <ContextFileInfo>[];
+              }
+              return AskScreen(contextFiles: contextFiles);
             },
           ),
           GoRoute(

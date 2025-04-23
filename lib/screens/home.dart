@@ -2,7 +2,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
+import 'package:go_router/go_router.dart';
+import 'package:learn_hub/configs/router_config.dart';
 import 'package:learn_hub/const/header_action.dart';
+import 'package:learn_hub/models/user.dart';
 import 'package:learn_hub/providers/appbar_provider.dart';
 import 'package:learn_hub/providers/app_auth_provider.dart';
 import 'package:learn_hub/providers/theme_provider.dart';
@@ -25,6 +28,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
+
   final scrollController = ScrollController();
   bool showFloatingButton = true;
 
@@ -142,10 +146,12 @@ class _HomeScreenState extends State<HomeScreen>
 
   @override
   Widget build(BuildContext context) {
-    final themeProvider = Provider.of<ThemeProvider>(context);
-    final cs = Theme.of(context).colorScheme;
     final authProvider = Provider.of<AppAuthProvider>(context);
-    final currentUser = authProvider.user;
+    final currentUser = authProvider.appUser;
+    final cs = Theme.of(context).colorScheme;
+    // print("User ${authProvider.user}");
+    // print("AppUser ${authProvider.appUser}");
+    // print("Current User ${currentUser}");
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Provider.of<AppBarProvider>(context, listen: false).setHeaderAction(
@@ -167,10 +173,10 @@ class _HomeScreenState extends State<HomeScreen>
           shaderCallback:
               (bounds) => LinearGradient(
                 colors: [
-                  Colors.transparent,
+                  cs.surface.withValues(alpha:0),
                   Colors.white,
                   Colors.white,
-                  Colors.transparent,
+                  cs.surface.withValues(alpha:0),
                 ],
                 stops: [0, 0.05, 0.88, 1],
                 begin: Alignment.topCenter,
@@ -188,8 +194,8 @@ class _HomeScreenState extends State<HomeScreen>
                   ),
               children: [
                 _buildHeader(cs, currentUser),
-                _buildWelcomeCard(cs),
-                _buildQuickStats(cs),
+                _buildWelcomeCard(cs, ),
+                _buildQuickStats(cs, ),
                 AlertBox(
                   subtitle: "✨ Upgrade to PRO for more features and benefits.",
                   type: AlertBoxType.warning,
@@ -241,7 +247,14 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  Widget _buildHeader(ColorScheme cs, User? currentUser) {
+  Widget _buildHeader(ColorScheme cs,AppUser? currentUser) {
+    final name =
+        currentUser?.displayName?.isNotEmpty == true
+            ? currentUser!.displayName!
+            : currentUser?.username?.isNotEmpty == true
+            ? currentUser!.username!
+            : (currentUser?.email ?? "??");
+
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 60, 20, 20),
       decoration: BoxDecoration(
@@ -264,16 +277,12 @@ class _HomeScreenState extends State<HomeScreen>
                 backgroundColor: cs.onPrimary.withValues(alpha: 0.2),
                 radius: 24,
                 backgroundImage:
-                    currentUser?.photoURL != null
-                        ? NetworkImage(currentUser!.photoURL!)
+                    currentUser?.photoURL != null && currentUser!.photoURL!.isNotEmpty && currentUser.photoURL!.startsWith("http")
+                        ? NetworkImage(currentUser.photoURL!)
                         : null,
                 child:
-                    currentUser?.photoURL == null
-                        ? Text(
-                          (currentUser?.displayName?.isNotEmpty == true
-                                  ? currentUser!.displayName!
-                                  : currentUser?.email ?? '??')
-                              .substring(0, 2)
+                    currentUser?.photoURL == null || !currentUser!.photoURL!.startsWith("http")
+                        ? Text(name.substring(0, 2)
                               .toUpperCase(),
                           style: TextStyle(
                             color: cs.onPrimary,
@@ -287,7 +296,7 @@ class _HomeScreenState extends State<HomeScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Hello, ${currentUser?.displayName?.isNotEmpty == true ? currentUser?.displayName : currentUser?.email}!',
+                    'Hello, $name!',
                     style: TextStyle(
                       color: cs.onPrimary,
                       fontSize: 20,
@@ -341,11 +350,7 @@ class _HomeScreenState extends State<HomeScreen>
             OutlinedButton.icon(
               onPressed:
                   () => {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => const GenerateQuizzesScreen(),
-                      ),
-                    ),
+                    context.pushNamed(AppRoute.generateQuiz.name),
                   },
               icon: const Icon(PhosphorIconsRegular.plus),
               label: const Text('Get Started'),
@@ -808,9 +813,7 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  void _showCreateQuizBottomSheet(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-
+  void _showCreateQuizBottomSheet(ColorScheme cs,BuildContext context) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,

@@ -1,33 +1,49 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:learn_hub/const/constants.dart';
+import 'package:learn_hub/const/material_service_config.dart';
+import 'package:learn_hub/screens/ask.dart';
+import 'package:learn_hub/services/material_manager.dart';
+import 'package:learn_hub/utils/api_helper.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
-enum SortOption { nameAsc, nameDesc, dateAsc, dateDesc, sizeAsc, sizeDesc }
+enum TaskState {
+  uploading("Uploading..."),
+  deleting("Deleting..."),
+  downloading("Downloading..."),
+  renaming("Renaming..."),
+  searching("Searching...");
 
-enum FilterFileType { pdf, doc, docx, md, txt, all, custom }
+  final String message;
+
+  const TaskState(this.message);
+}
 
 class MaterialDocument {
   final String id;
   final String name;
-  final String path;
   final String extension;
-  final int size; // in bytes
+  final int size;
   final DateTime dateAdded;
-  final DateTime? lastModified;
+  final bool isPublic;
+  final String url;
+  final String userId;
 
   MaterialDocument({
     required this.id,
     required this.name,
-    required this.path,
     required this.extension,
     required this.size,
     required this.dateAdded,
-    this.lastModified,
+    required this.isPublic,
+    required this.url,
+    required this.userId,
   });
 }
 
@@ -40,13 +56,24 @@ class MaterialsScreen extends StatefulWidget {
 
 class _MaterialsScreenState extends State<MaterialsScreen> {
   bool _isLoading = true;
+  bool _isLoadingMore = false;
+  int _totalResults = 0;
+  final int _pageSize = 8;
+  int _currentPage = 0;
+  bool _hasMoreData = true;
+
+  late ScrollController _scrollController;
+
+  bool _isProcessingTask = false;
+  TaskState _currentTaskState = TaskState.searching;
+
   bool _isMultiSelectMode = false;
   final Set<String> _selectedDocuments = {};
   final TextEditingController _searchController = TextEditingController();
   final TextEditingController _renameController = TextEditingController();
 
   SortOption _currentSortOption = SortOption.dateDesc;
-  FilterFileType _currentFilterFileType = FilterFileType.all;
+  FileExtension _currentFileExtension = FileExtension.all;
   String _searchQuery = '';
 
   List<MaterialDocument> _documents = [];
@@ -59,6 +86,8 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
   @override
   void initState() {
     super.initState();
+    _scrollController = ScrollController();
+    _scrollController.addListener(_scrollListener);
     _searchController.addListener(_onSearchChanged);
     _loadDocuments();
   }
@@ -66,6 +95,8 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
   @override
   void dispose() {
     _debounce?.cancel();
+    _scrollController.removeListener(_scrollListener);
+    _scrollController.dispose();
     _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
     _renameController.dispose();
@@ -77,131 +108,349 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
     _debounce = Timer(const Duration(milliseconds: 300), () {
       setState(() {
         _searchQuery = _searchController.text;
+        _currentPage = 0;
+        _hasMoreData = true;
         _applyFilters();
       });
     });
+  }
+
+  void _scrollListener() {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      if (!_isLoadingMore && _hasMoreData && !_isProcessingTask) {
+        _loadMoreDocuments();
+      }
+    }
   }
 
   Future<void> _loadDocuments() async {
-    setState(() {
-      _isLoading = true;
-    });
+    try {
+      setState(() {
+        _isLoading = true;
+        _currentPage = 0;
+        _hasMoreData = true;
+      });
 
-    // Simulating loading documents
-    await Future.delayed(const Duration(seconds: 1));
-
-    // Replace this with your actual document loading logic
-    _documents = List.generate(
-      20,
-      (index) => MaterialDocument(
-        id: 'doc-$index',
-        name: 'Document ${index + 1}',
-        path: '/path/to/document${index + 1}',
-        extension: _getRandomExtension(),
-        size: 1000000 + (index * 500000),
-        dateAdded: DateTime.now().subtract(Duration(days: index)),
-        lastModified:
-            index % 2 == 0
-                ? DateTime.now().subtract(Duration(hours: index * 5))
-                : null,
-      ),
-    );
-
-    _applyFilters();
-    setState(() {
-      _isLoading = false;
-    });
+      final response = await MaterialManager.instance.searchMaterial(
+        SearchMaterialConfig(
+          searchText: _searchQuery,
+          isPublic: false,
+          size: _pageSize,
+          start: _currentPage * _pageSize,
+        ),
+      );
+      if (response.isNotEmpty) {
+        if (response['status'] == 'success') {
+          _totalResults = response['total'] ?? 0;
+          _documents =
+              (response['data'] as List)
+                  .map(
+                    (doc) => MaterialDocument(
+                      id: doc['_id'],
+                      name: doc['filename'],
+                      extension: doc['file_extension'] ?? "",
+                      size: doc['file_size'] ?? 0,
+                      dateAdded: DateTime.parse(doc['date']),
+                      isPublic: doc['is_public'],
+                      url: doc['file_url'],
+                      userId: doc['user_id'],
+                    ),
+                  )
+                  .toList();
+          setState(() {
+            _filteredDocuments = _documents;
+          });
+        } else {
+          print('Error loading documents: ${response['message']}');
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error loading documents: ${response['message']}'),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print('Error loading documents: $e');
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error loading documents: $e')));
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
-  String _getRandomExtension() {
-    final extensions = ['pdf', 'doc', 'docx', 'md', 'txt'];
-    return extensions[_documents.length % extensions.length];
+  Future<void> _loadMoreDocuments() async {
+    if (!_hasMoreData || _isLoadingMore) return;
+
+    try {
+      setState(() {
+        _isLoadingMore = true;
+      });
+
+      final nextPage = _currentPage + 1;
+      final response = await MaterialManager.instance.searchMaterial(
+        SearchMaterialConfig(
+          searchText: _searchQuery,
+          fileExtension:
+              _currentFileExtension == FileExtension.all
+                  ? null
+                  : _currentFileExtension,
+          isPublic: false,
+          size: _pageSize,
+          start: nextPage * _pageSize,
+        ),
+      );
+      _handleSearchResponse(response, true);
+
+      if (_hasMoreData) {
+        _currentPage = nextPage;
+      }
+    } catch (e) {
+      print('Error loading more documents: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error loading more documents: $e')),
+      );
+    } finally {
+      setState(() {
+        _isLoadingMore = false;
+      });
+    }
   }
 
-  void _applyFilters() {
-    // Filter by search query
-    var filtered =
-        _documents
-            .where(
-              (doc) =>
-                  doc.name.toLowerCase().contains(_searchQuery.toLowerCase()),
-            )
-            .toList();
+  void _handleSearchResponse(
+    Map<String, dynamic> response,
+    bool isLoadingMore,
+  ) {
+    if (response.isNotEmpty) {
+      if (response['status'] == 'success') {
+        _totalResults = response['total'] ?? 0;
+        final List<MaterialDocument> newDocuments =
+            (response['data'] as List)
+                .map(
+                  (doc) => MaterialDocument(
+                    id: doc['_id'],
+                    name: doc['filename'],
+                    extension: doc['file_extension'] ?? "",
+                    size: doc['file_size'] ?? 0,
+                    dateAdded: DateTime.parse(doc['date']),
+                    isPublic: doc['is_public'],
+                    url: doc['file_url'],
+                    userId: doc['user_id'],
+                  ),
+                )
+                .toList();
 
-    // Filter by file type
-    if (_currentFilterFileType != FilterFileType.all) {
-      filtered =
-          filtered
-              .where(
-                (doc) =>
-                    doc.extension.toLowerCase() ==
-                    _currentFilterFileType.name.toLowerCase(),
-              )
-              .toList();
+        setState(() {
+          if (isLoadingMore) {
+            _filteredDocuments.addAll(newDocuments);
+            _documents.addAll(newDocuments);
+          } else {
+            _filteredDocuments = newDocuments;
+            _documents = newDocuments;
+          }
+
+          _hasMoreData = response['total'] == _pageSize;
+        });
+
+
+        print('Loaded ${newDocuments.length} more documents');
+      }
+    } else {
+      setState(() {
+        _hasMoreData = false;
+      });
+      print('Error loading more documents: ${response['message']}');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error loading more documents: ${response['message']}'),
+        ),
+      );
+    }
+  }
+
+  void _applyFilters() async {
+    try {
+      setState(() {
+        _isLoading = true;
+        _currentPage = 0;
+        _hasMoreData = true;
+      });
+      final SearchMaterialConfig config = SearchMaterialConfig(
+        searchText: _searchQuery,
+        fileExtension:
+            _currentFileExtension == FileExtension.all
+                ? null
+                : _currentFileExtension,
+        isPublic: false,
+        size: _pageSize,
+        start: 0,
+      );
+
+      final response = await MaterialManager.instance.searchMaterial(config);
+      if (response.isNotEmpty) {
+        if (response['status'] == 'success') {
+          _filteredDocuments =
+              (response['data'] as List)
+                  .map(
+                    (doc) => MaterialDocument(
+                      id: doc['_id'],
+                      name: doc['filename'],
+                      extension: doc['file_extension'] ?? "",
+                      size: doc['file_size'] ?? 0,
+                      dateAdded: DateTime.parse(doc['date']),
+                      isPublic: doc['is_public'],
+                      url: doc['file_url'],
+                      userId: doc['user_id'],
+                    ),
+                  )
+                  .toList();
+          setState(() {});
+        } else {
+          print('Error applying filters: ${response['message']}');
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error applying filters: ${response['message']}'),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print('Error applying filters: $e');
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error applying filters: $e')));
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
     }
 
-    // Sort documents
-    switch (_currentSortOption) {
-      case SortOption.nameAsc:
-        filtered.sort((a, b) => a.name.compareTo(b.name));
-      case SortOption.nameDesc:
-        filtered.sort((a, b) => b.name.compareTo(a.name));
-      case SortOption.dateAsc:
-        filtered.sort((a, b) => a.dateAdded.compareTo(b.dateAdded));
-      case SortOption.dateDesc:
-        filtered.sort((a, b) => b.dateAdded.compareTo(a.dateAdded));
-      case SortOption.sizeAsc:
-        filtered.sort((a, b) => a.size.compareTo(b.size));
-      case SortOption.sizeDesc:
-        filtered.sort((a, b) => b.size.compareTo(a.size));
-    }
-
-    setState(() {
-      _filteredDocuments = filtered;
-    });
+    // var filtered =
+    //     _documents
+    //         .where(
+    //           (doc) =>
+    //               doc.name.toLowerCase().contains(_searchQuery.toLowerCase()),
+    //         )
+    //         .toList();
+    //
+    // // Filter by file type
+    // if (_currentFileExtension != FileExtension.all) {
+    //   filtered =
+    //       filtered
+    //           .where(
+    //             (doc) =>
+    //                 doc.extension.toLowerCase() ==
+    //                 _currentFileExtension.name.toLowerCase(),
+    //           )
+    //           .toList();
+    // }
+    //
+    // // Sort documents
+    // switch (_currentSortOption) {
+    //   case SortOption.nameAsc:
+    //     filtered.sort((a, b) => a.name.compareTo(b.name));
+    //   case SortOption.nameDesc:
+    //     filtered.sort((a, b) => b.name.compareTo(a.name));
+    //   case SortOption.dateAsc:
+    //     filtered.sort((a, b) => a.dateAdded.compareTo(b.dateAdded));
+    //   case SortOption.dateDesc:
+    //     filtered.sort((a, b) => b.dateAdded.compareTo(a.dateAdded));
+    //   case SortOption.sizeAsc:
+    //     filtered.sort((a, b) => a.size.compareTo(b.size));
+    //   case SortOption.sizeDesc:
+    //     filtered.sort((a, b) => b.size.compareTo(a.size));
+    // }
+    //
+    // setState(() {
+    //   _filteredDocuments = filtered;
+    // });
   }
 
   Future<void> _pickAndUploadFile() async {
-    FilePickerResult? result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['pdf', 'doc', 'docx', 'md', 'txt'],
-      withData: true,
-    );
-
-    if (result != null) {
-      setState(() {
-        _isLoading = true;
-      });
-
-      // Simulate upload process
-      await Future.delayed(const Duration(seconds: 2));
-
-      // Add new documents
-      final newDocs =
-          result.files
-              .map(
-                (file) => MaterialDocument(
-                  id: 'doc-${_documents.length + 1}',
-                  name: file.name,
-                  path: file.path ?? '',
-                  extension: file.extension ?? '',
-                  size: file.size,
-                  dateAdded: DateTime.now(),
-                ),
-              )
-              .toList();
-
-      setState(() {
-        _documents.addAll(newDocs);
-        _applyFilters();
-        _isLoading = false;
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${result.files.length} file(s) uploaded successfully'),
-        ),
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'doc', 'docx', 'md', 'txt'],
+        withData: true,
       );
+
+      if (result != null) {
+        setState(() {
+          _isProcessingTask = true;
+          _currentTaskState = TaskState.uploading;
+        });
+
+        if (result.files.isEmpty) {
+          setState(() {
+            _isProcessingTask = false;
+            _currentTaskState = TaskState.searching;
+          });
+          return;
+        }
+
+        final file = result.files.first;
+
+        final response = await MaterialManager.instance.uploadMaterial(
+          FileUploadConfig(
+            file: File(file.path!),
+            isPublic: false,
+            fileInfo: file,
+          ),
+        );
+
+        if (response['status'] == 'error') {
+          setState(() {
+            _isProcessingTask = false;
+            _currentTaskState = TaskState.searching;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error uploading file: ${response['message']}'),
+            ),
+          );
+          return;
+        }
+
+        print(response);
+
+        final newDoc = MaterialDocument(
+          id: response['data']['_id'],
+          name: file.name,
+          extension: file.extension ?? '',
+          size: response['data']['file_size'] ?? 0,
+          dateAdded: DateTime.parse(response['data']['date']),
+          isPublic: response['data']['is_public'],
+          url: response['data']['file_url'],
+          userId: response['data']['user_id'],
+        );
+
+        setState(() {
+          _documents.add(newDoc);
+          _applyFilters();
+          _isProcessingTask = false;
+          _currentTaskState = TaskState.searching;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '${result.files.length} file(s) uploaded successfully',
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      print('Error uploading file: $e');
+      setState(() {
+        _isProcessingTask = false;
+        _currentTaskState = TaskState.searching;
+      });
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error uploading file: $e')));
     }
   }
 
@@ -308,33 +557,33 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
                     Wrap(
                       spacing: 8,
                       children: [
-                        _buildFilterFileTypeChip(
-                          FilterFileType.all,
+                        _buildFileExtensionChip(
+                          FileExtension.all,
                           'All',
                           setModalState,
                         ),
-                        _buildFilterFileTypeChip(
-                          FilterFileType.pdf,
+                        _buildFileExtensionChip(
+                          FileExtension.pdf,
                           'PDF',
                           setModalState,
                         ),
-                        _buildFilterFileTypeChip(
-                          FilterFileType.doc,
+                        _buildFileExtensionChip(
+                          FileExtension.doc,
                           'DOC',
                           setModalState,
                         ),
-                        _buildFilterFileTypeChip(
-                          FilterFileType.docx,
+                        _buildFileExtensionChip(
+                          FileExtension.docx,
                           'DOCX',
                           setModalState,
                         ),
-                        _buildFilterFileTypeChip(
-                          FilterFileType.md,
+                        _buildFileExtensionChip(
+                          FileExtension.md,
                           'MD',
                           setModalState,
                         ),
-                        _buildFilterFileTypeChip(
-                          FilterFileType.txt,
+                        _buildFileExtensionChip(
+                          FileExtension.txt,
                           'TXT',
                           setModalState,
                         ),
@@ -374,7 +623,9 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
         });
       },
       backgroundColor: cs.surface,
-      labelStyle: TextStyle(color: isSelected ? cs.primary : cs.onSurfaceVariant),
+      labelStyle: TextStyle(
+        color: isSelected ? cs.primary : cs.onSurfaceVariant,
+      ),
       selectedColor: cs.primary.withValues(alpha: 0.2),
       checkmarkColor: cs.primary,
       shape: RoundedRectangleBorder(
@@ -384,22 +635,24 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
     );
   }
 
-  Widget _buildFilterFileTypeChip(
-    FilterFileType type,
+  Widget _buildFileExtensionChip(
+    FileExtension type,
     String label,
     StateSetter setModalState,
   ) {
-    final isSelected = _currentFilterFileType == type;
+    final isSelected = _currentFileExtension == type;
     return ChoiceChip(
       label: Text(label),
       selected: isSelected,
       onSelected: (selected) {
         setModalState(() {
-          _currentFilterFileType = type;
+          _currentFileExtension = type;
         });
       },
       backgroundColor: cs.surface,
-      labelStyle: TextStyle(color: isSelected ? cs.primary : cs.onSurfaceVariant),
+      labelStyle: TextStyle(
+        color: isSelected ? cs.primary : cs.onSurfaceVariant,
+      ),
       selectedColor: cs.primary.withValues(alpha: 0.2),
       checkmarkColor: cs.primary,
       shape: RoundedRectangleBorder(
@@ -420,16 +673,24 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
             children: [
               ListTile(
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.vertical(
-                    top: Radius.circular(25),
-                  ),
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
                 ),
                 leading: Icon(PhosphorIconsRegular.chatDots, color: cs.primary),
                 title: Text('Send to Chat'),
                 onTap: () {
                   Navigator.pop(context);
                   if (context.mounted) {
-                    context.go("/chat?materialIds=${doc.id}");
+                    context.go(
+                      "/chat",
+                      extra: [
+                        ContextFileInfo(
+                          id: doc.id,
+                          filename: doc.name,
+                          extension: doc.extension,
+                          size: doc.size,
+                        ),
+                      ],
+                    );
                   }
                 },
               ),
@@ -555,28 +816,59 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
     );
   }
 
-  void _deleteDocuments(List<String> docIds) {
-    setState(() {
-      _documents.removeWhere((doc) => docIds.contains(doc.id));
-      _selectedDocuments.removeAll(docIds);
-      _applyFilters();
-    });
+  void _deleteDocuments(List<String> docIds) async {
+    try {
+      setState(() {
+        _isProcessingTask = true;
+        _currentTaskState = TaskState.deleting;
+      });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          docIds.length > 1
-              ? '${docIds.length} documents deleted'
-              : 'Document deleted',
+      final List<String> failedIds = [];
+
+      for (final docId in docIds) {
+        final response = await MaterialManager.instance.deleteMaterialById(
+          docId,
+        );
+        if (response['status'] != 'success') {
+          failedIds.add(docId);
+        }
+      }
+
+      setState(() {
+        _documents.removeWhere(
+          (doc) => docIds.contains(doc.id) && !failedIds.contains(doc.id),
+        );
+        _selectedDocuments.removeAll(docIds);
+        // _applyFilters();
+      });
+
+      final String message =
+          failedIds.isNotEmpty
+              ? 'Some documents could not be deleted: ${failedIds.join(', ')}'
+              : 'Documents deleted successfully';
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          // action: SnackBarAction(
+          //   label: 'Undo',
+          //   onPressed: () {
+          //     // Implement undo functionality
+          //   },
+          // ),
         ),
-        action: SnackBarAction(
-          label: 'Undo',
-          onPressed: () {
-            // Implement undo functionality
-          },
-        ),
-      ),
-    );
+      );
+    } catch (e) {
+      print('Error deleting documents: $e');
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error deleting documents: $e')));
+    } finally {
+      setState(() {
+        _isProcessingTask = false;
+        _currentTaskState = TaskState.searching;
+      });
+    }
   }
 
   Widget _buildDocumentCard(MaterialDocument doc) {
@@ -720,7 +1012,6 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
 
   @override
   Widget build(BuildContext context) {
-
     return Scaffold(
       floatingActionButton: Padding(
         padding: const EdgeInsets.only(bottom: 72),
@@ -826,7 +1117,26 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
               ],
             ),
           ),
-          if (_isLoading) ...[
+          if (_isProcessingTask)
+            Container(
+              margin: EdgeInsets.only(bottom: 12),
+              child: Column(
+                spacing: 8,
+                children: [
+                  Text(
+                    _currentTaskState.message,
+                    style: TextStyle(
+                      color: cs.onSurface.withValues(alpha: 0.6),
+                    ),
+                  ),
+                  LinearProgressIndicator(
+                    value: null,
+                    backgroundColor: cs.surface.withValues(alpha: 0.5),
+                  ),
+                ],
+              ),
+            ),
+          if (_isLoading && _currentPage == 0) ...[
             const SizedBox(height: 24),
             const Center(child: CircularProgressIndicator()),
           ] else if (_filteredDocuments.isEmpty)
@@ -867,35 +1177,56 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
                         Colors.white,
                         Colors.white,
                         Colors.white,
-                        Colors.transparent,
+                        cs.surface.withValues(alpha: 0),
                       ],
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
-                      stops: [
-                        0.0,
-                        0.0,
-                        0.9,
-                        1.0,
-                      ]
+                      stops: [0.0, 0.0, 0.9, 1.0],
                     ).createShader(bounds),
                 child: AnimationLimiter(
-                  child: ListView.builder(
-                    padding: const EdgeInsets.only(bottom: 80),
-                    itemCount: _filteredDocuments.length,
-                    itemBuilder: (context, index) {
-                      return AnimationConfiguration.staggeredList(
-                        position: index,
-                        duration: const Duration(milliseconds: 375),
-                        child: SlideAnimation(
-                          verticalOffset: 50.0,
-                          child: FadeInAnimation(
-                            child: _buildDocumentCard(
-                              _filteredDocuments[index],
+                  child: RefreshIndicator(
+                    onRefresh: _loadDocuments,
+                    child: ListView.builder(
+                      padding: const EdgeInsets.only(bottom: 80),
+                      controller: _scrollController,
+                      itemCount: _filteredDocuments.length + 1,
+                      physics: const AlwaysScrollableScrollPhysics(
+                        parent: BouncingScrollPhysics(),
+                      ),
+                      itemBuilder: (context, index) {
+                        if (index == _filteredDocuments.length) {
+                          return _isLoadingMore
+                              ? Center(
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 16.0,
+                                  ),
+                                  child: CircularProgressIndicator(),
+                                ),
+                              )
+                              : SizedBox(
+                                height:
+                                    _filteredDocuments.isEmpty
+                                        ? MediaQuery.of(context).size.height *
+                                            0.6
+                                        : 40,
+                              );
+                        }
+
+                        return AnimationConfiguration.staggeredList(
+                          position: index,
+                          duration: const Duration(milliseconds: 375),
+                          child: SlideAnimation(
+                            verticalOffset: 50.0,
+                            child: FadeInAnimation(
+                              child: _buildDocumentCard(
+                                _filteredDocuments[index],
+                              ),
                             ),
                           ),
-                        ),
-                      );
-                    },
+                        );
+                      },
+                    ),
                   ),
                 ),
               ),

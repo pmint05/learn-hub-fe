@@ -2,14 +2,22 @@ import 'package:animations/animations.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:learn_hub/configs/router_config.dart';
+import 'package:learn_hub/models/quiz.dart';
 import 'package:learn_hub/screens/do_quizzes_result.dart';
+import 'package:learn_hub/services/quiz_manager.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 class DoQuizzesScreen extends StatefulWidget {
-  final List<Map<String, dynamic>> quizzes;
+  final List<Map<String, dynamic>>? quizzes;
+  final Quiz? quiz;
   final AppRoute? prevRoute;
 
-  const DoQuizzesScreen({super.key, required this.quizzes, this.prevRoute});
+  const DoQuizzesScreen({
+    super.key,
+    this.quizzes = const [],
+    this.quiz,
+    this.prevRoute,
+  });
 
   @override
   State<DoQuizzesScreen> createState() => _DoQuizzesScreenState();
@@ -28,17 +36,68 @@ class _DoQuizzesScreenState extends State<DoQuizzesScreen> {
 
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
+  List<Map<String, dynamic>> quizzes = [];
+
   @override
   void initState() {
     super.initState();
-    if (widget.quizzes.isEmpty) {
-      setState(() {
-        errorMessage = "No quizzes available";
-      });
+    _initializeQuizData();
+  }
+
+  Future<void> _initializeQuizData() async {
+    setState(() {
+      isLoading = true;
+      errorMessage = null;
+    });
+
+    if (widget.quizzes != null &&
+        widget.quizzes!.isNotEmpty &&
+        widget.quiz == null) {
+      quizzes = widget.quizzes!;
+    } else if (widget.quiz != null) {
+      try {
+        final quizData = await QuizManager.instance.getQuizById(
+          quizId: widget.quiz!.quizId.toString(),
+        );
+
+        if (quizData['status'] == 'success') {
+          final questionsData = quizData['data']['questions'];
+
+          if (questionsData != null && questionsData is List) {
+            setState(() {
+              quizzes = List<Map<String, dynamic>>.from(questionsData);
+            });
+          } else {
+            setState(() {
+              errorMessage = "No questions found in this quiz.";
+            });
+          }
+        } else {
+          setState(() {
+            errorMessage = quizData['message'] ?? "Something went wrong while loading quiz, please try again.";
+          });
+        }
+      } catch (e) {
+        setState(() {
+          errorMessage = "Exception in loading quiz: $e";
+          print(e);
+        });
+      }
     } else {
-      userAnswers = List.filled(widget.quizzes.length, null);
-      answerResults = List.filled(widget.quizzes.length, false);
+      setState(() {
+        errorMessage = "No quiz data available";
+      });
     }
+
+    // Initialize answer arrays
+    if (quizzes.isNotEmpty) {
+      userAnswers = List.filled(quizzes.length, null);
+      answerResults = List.filled(quizzes.length, false);
+    }
+
+    setState(() {
+      isLoading = false;
+    });
   }
 
   void _selectAnswer(int index) {
@@ -48,7 +107,7 @@ class _DoQuizzesScreenState extends State<DoQuizzesScreen> {
   }
 
   void _nextQuestion() {
-    if (currentQuestionIndex < widget.quizzes.length - 1) {
+    if (currentQuestionIndex < quizzes.length - 1) {
       setState(() {
         currentQuestionIndex++;
         selectedAnswerIndex = null;
@@ -57,7 +116,7 @@ class _DoQuizzesScreenState extends State<DoQuizzesScreen> {
   }
 
   void _showExplanation() {
-    final currentQuiz = widget.quizzes[currentQuestionIndex];
+    final currentQuiz = quizzes[currentQuestionIndex];
     showGeneralDialog(
       context: context,
       barrierDismissible: true,
@@ -101,7 +160,7 @@ class _DoQuizzesScreenState extends State<DoQuizzesScreen> {
   }
 
   void _checkAnswer() {
-    final currentQuiz = widget.quizzes[currentQuestionIndex];
+    final currentQuiz = quizzes[currentQuestionIndex];
     final correctAnswerIndex = currentQuiz['answer'];
     final isCorrect = selectedAnswerIndex == correctAnswerIndex;
     // print(currentQuiz);
@@ -113,6 +172,7 @@ class _DoQuizzesScreenState extends State<DoQuizzesScreen> {
     answerResults[currentQuestionIndex] = isCorrect;
 
     showModalBottomSheet(
+      enableDrag: false,
       context: context,
       builder:
           (context) => Container(
@@ -186,7 +246,7 @@ class _DoQuizzesScreenState extends State<DoQuizzesScreen> {
                 ElevatedButton(
                   onPressed: () {
                     Navigator.pop(context);
-                    if (currentQuestionIndex == widget.quizzes.length - 1) {
+                    if (currentQuestionIndex == quizzes.length - 1) {
                       // context.pushNamed(
                       //   AppRoute.quizResults.name,
                       //   extra: {
@@ -209,7 +269,7 @@ class _DoQuizzesScreenState extends State<DoQuizzesScreen> {
                             animation: animation,
                             secondaryAnimation: secondaryAnimation,
                             child: ResultScreen(
-                              quizzes: widget.quizzes,
+                              quizzes: quizzes,
                               userAnswers: userAnswers,
                               answerResults: answerResults,
                             ),
@@ -222,14 +282,8 @@ class _DoQuizzesScreenState extends State<DoQuizzesScreen> {
                           setState(() {
                             currentQuestionIndex = 0;
                             selectedAnswerIndex = null;
-                            userAnswers = List.filled(
-                              widget.quizzes.length,
-                              null,
-                            );
-                            answerResults = List.filled(
-                              widget.quizzes.length,
-                              false,
-                            );
+                            userAnswers = List.filled(quizzes.length, null);
+                            answerResults = List.filled(quizzes.length, false);
                           });
                         }
                       });
@@ -246,13 +300,13 @@ class _DoQuizzesScreenState extends State<DoQuizzesScreen> {
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       Text(
-                        currentQuestionIndex == widget.quizzes.length - 1
+                        currentQuestionIndex == quizzes.length - 1
                             ? "Finish!"
                             : "Next",
                         style: TextStyle(fontSize: 16),
                       ),
                       const SizedBox(width: 10),
-                      if (currentQuestionIndex != widget.quizzes.length - 1)
+                      if (currentQuestionIndex != quizzes.length - 1)
                         PhosphorIcon(
                           PhosphorIconsBold.arrowRight,
                           color: Colors.white,
@@ -275,19 +329,70 @@ class _DoQuizzesScreenState extends State<DoQuizzesScreen> {
     // (widget.quizzes.toString());
     // print(isLoading);
     if (isLoading) {
-      return Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
-    if (widget.quizzes.isEmpty) {
       return Scaffold(
-        body: Center(child: Text("No quizzes available!")),
         appBar: AppBar(
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
+            icon: const Icon(PhosphorIconsBold.arrowLeft),
             onPressed:
                 () =>
                     context.canPop()
                         ? context.pop()
                         : context.goNamed(AppRoute.quizzes.name),
+          ),
+          title: const Text('Loading Quiz'),
+        ),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(color: cs.primary),
+              const SizedBox(height: 16),
+              Text(
+                'Loading quiz data...',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: cs.onSurfaceVariant,
+                  fontFamily: 'BricolageGrotesque',
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    if (quizzes.isEmpty || errorMessage != null) {
+      return Scaffold(
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(PhosphorIconsBold.arrowLeft),
+            onPressed:
+                () =>
+                    context.canPop()
+                        ? context.pop()
+                        : context.goNamed(AppRoute.quizzes.name),
+          ),
+          title: const Text('Quiz Error'),
+        ),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(PhosphorIconsRegular.warning, size: 48, color: cs.error),
+              const SizedBox(height: 16),
+              Text(
+                errorMessage ?? "No quizzes available!",
+                style: TextStyle(
+                  fontSize: 16,
+                  color: cs.onSurface,
+                  fontFamily: 'BricolageGrotesque',
+                ),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: () => context.goNamed(AppRoute.quizzes.name),
+                child: const Text("Back to Quizzes"),
+              ),
+            ],
           ),
         ),
       );
@@ -304,8 +409,8 @@ class _DoQuizzesScreenState extends State<DoQuizzesScreen> {
       );
     }
 
-    final currentQuiz = widget.quizzes[currentQuestionIndex];
-    final progress = (currentQuestionIndex) / widget.quizzes.length;
+    final currentQuiz = quizzes[currentQuestionIndex];
+    final progress = (currentQuestionIndex) / quizzes.length;
     return Scaffold(
       key: _scaffoldKey,
       appBar: PreferredSize(
@@ -349,14 +454,14 @@ class _DoQuizzesScreenState extends State<DoQuizzesScreen> {
                       minHeight: 12,
                       semanticsLabel: 'Quiz Progress',
                       semanticsValue:
-                          '${currentQuestionIndex + 1}/${widget.quizzes.length}',
+                          '${currentQuestionIndex + 1}/${quizzes.length}',
                     );
                   },
                 ),
               ),
               const SizedBox(width: 10),
               Text(
-                '${currentQuestionIndex + 1}/${widget.quizzes.length}',
+                '${currentQuestionIndex + 1}/${quizzes.length}',
                 style: const TextStyle(
                   color: Colors.grey,
                   fontWeight: FontWeight.w500,
@@ -393,20 +498,28 @@ class _DoQuizzesScreenState extends State<DoQuizzesScreen> {
                 ),
               ),
               const Spacer(),
-              ...List.generate(
-                currentQuiz['options'].length,
-                (index) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12.0),
-                  child: ChoiceCard(
-                    option: currentQuiz['options'][index],
-                    index: index,
-                    isSelected: selectedAnswerIndex == index,
-                    onTap: () => _selectAnswer(index),
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(context).size.height * 0.5,
+                ),
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: List.generate(
+                      currentQuiz['options'].length,
+                          (index) => Padding(
+                        padding: const EdgeInsets.only(top: 12.0),
+                        child: ChoiceCard(
+                          option: currentQuiz['options'][index],
+                          index: index,
+                          isSelected: selectedAnswerIndex == index,
+                          onTap: () => _selectAnswer(index),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ),
-
-              const SizedBox(height: 30),
+              const SizedBox(height: 16),
 
               SizedBox(
                 width: double.infinity,
@@ -419,13 +532,13 @@ class _DoQuizzesScreenState extends State<DoQuizzesScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        currentQuestionIndex == widget.quizzes.length - 1
+                        currentQuestionIndex == quizzes.length - 1
                             ? 'Done!'
                             : 'Check Answer',
                         style: TextStyle(fontSize: 16),
                       ),
                       const SizedBox(width: 10),
-                      if (currentQuestionIndex != widget.quizzes.length - 1)
+                      if (currentQuestionIndex != quizzes.length - 1)
                         PhosphorIcon(
                           PhosphorIconsBold.arrowRight,
                           color:

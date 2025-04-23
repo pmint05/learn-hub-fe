@@ -59,10 +59,14 @@ final List<Map<String, dynamic>> routes = [
     "route": "/chat"
   },
   {
-    "icon": "",
-    "filledIcon": "",
-    "title": "LearnHub",
-    "label": "",
+    "icon": {
+      "regular": PhosphorIconsRegular.user,
+      "bold": PhosphorIconsBold.user,
+      "filled": PhosphorIconsFill.user,
+      "duotone": PhosphorIconsDuotone.user,
+    },
+    "title": "Profile",
+    "label": "Profile",
     "screen": const ProfileScreen(),
     "showOnNav": false,
     "route": "/profile"

@@ -1,288 +1,482 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:learn_hub/configs/router_config.dart';
+import 'package:learn_hub/const/header_action.dart';
+import 'package:learn_hub/models/user.dart';
 import 'package:learn_hub/providers/app_auth_provider.dart';
-import 'package:learn_hub/screens/welcome.dart';
+import 'package:learn_hub/providers/appbar_provider.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'dart:math';
+
 import 'package:provider/provider.dart';
 
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({Key? key}) : super(key: key);
+  const ProfileScreen({super.key});
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  final _fullnameController = TextEditingController(text: "Anh Lân Đi Bộ");
-  final _usernameController = TextEditingController(text: "@anhlandibo_");
-  final _emailController = TextEditingController(text: "anhlandibo@gmail.com");
-  final _phoneController = TextEditingController(text: "0123456789");
-  final _birthdayController = TextEditingController(text: "Date of Birth");
+  late ColorScheme cs = Theme.of(context).colorScheme;
+  late AppUser? currentUser =
+      Provider.of<AppAuthProvider>(context, listen: false).appUser;
+  String? _displayName;
+  String? _username;
+  String? _photoURL;
+  int? _credits;
+  bool? _isVip;
+  DateTime? _vipExpiration;
+  int? _questSets;
+  int? _questAsked;
+  int? _questAnswered;
+  int? _quizzesDone;
 
-  String _selectedGender = "Male";
-  bool _googleLinked = true;
+  // Moved _showSettings into State to access context
+  void _showSettings() {
+    context.pushNamed(AppRoute.settings.name).then((_) {
+      // Refresh data when returning from settings
+      _loadUserData();
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Safe to access context-dependent resources here
+    cs = Theme.of(context).colorScheme;
+    _loadUserData();
+    print("ProfileScreen didChangeDependencies");
+  }
+
+  void _loadUserData() {
+    // Get fresh user data
+    currentUser = Provider.of<AppAuthProvider>(context, listen: false).appUser;
+    _initializeUserData();
+  }
+
+  void _initializeUserData() {
+    if (currentUser != null) {
+      _displayName = currentUser!.displayName ?? "";
+      _username = currentUser!.username ?? "Username";
+      _credits = currentUser?.credits ?? 0;
+      _photoURL = currentUser!.photoURL ?? "";
+      _isVip = currentUser!.isVIP ?? false;
+      _vipExpiration = currentUser!.vipExpiration;
+      _questSets = 0;
+      _questAsked = 0;
+      _questAnswered = 0;
+      _quizzesDone = 0;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<AppBarProvider>(context, listen: false).setHeaderAction(
+        HeaderAction(type: AppBarActionType.settings, callback: _showSettings),
+      );
+    });
+
     return Scaffold(
-      extendBodyBehindAppBar: false,
-      body: ShaderMask(
-        shaderCallback:
-            (bounds) => LinearGradient(
-          colors: [
-            Colors.transparent,
-            Colors.white,
-            Colors.white,
-            Colors.transparent,
-          ],
-          stops: [0.0, 0.05, 0.9, 1.0],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ).createShader(bounds),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-          child: Column(
+      body: Column(
+        children: [
+          Stack(
+            alignment: Alignment.bottomCenter,
+            clipBehavior: Clip.none,
             children: [
-              const SizedBox(height: 24),
-              Stack(
-                alignment: Alignment.bottomRight,
-                children: [
-                  CircleAvatar(
-                    radius: 36,
-                    backgroundColor: Theme.of(context).colorScheme.surface,
-                    child: Text(
-                      "R",
-                      style: Theme.of(context).textTheme.displayMedium
-                          ?.copyWith(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  Container(
-                    width: 24,
-                    height: 24,
-                    margin: const EdgeInsets.only(bottom: 2, right: 2),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primary,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.camera_alt,
-                      size: 16,
-                      color: Colors.white,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-              _buildTextField("Fullname", _fullnameController),
-              const SizedBox(height: 16),
-              _buildTextField("Username", _usernameController),
-              const SizedBox(height: 16),
-              _buildTextField(
-                "Email",
-                _emailController,
-                keyboardType: TextInputType.emailAddress,
-              ),
-              const SizedBox(height: 16),
-              _buildTextField(
-                "Phone number",
-                _phoneController,
-                keyboardType: TextInputType.phone,
-              ),
-              const SizedBox(height: 16),
-              _buildTextField(
-                "Your birthday",
-                _birthdayController,
-                readOnly: true,
-                onTap: () async {
-                  final DateTime? picked = await showDatePicker(
-                    context: context,
-                    initialDate: DateTime(1990, 1, 1),
-                    firstDate: DateTime(1900),
-                    lastDate: DateTime.now(),
-                  );
-                  if (picked != null) {
-                    setState(() {
-                      _birthdayController.text =
-                      "${picked.day}/${picked.month}/${picked.year}";
-                    });
-                  }
-                },
-              ),
-              const SizedBox(height: 16),
-              _buildGenderDropdown(),
-              const SizedBox(height: 16),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  "Account linked",
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
+              Container(
+                decoration: BoxDecoration(
+                  border:
+                      _isVip == true
+                          ? Border.all(color: cs.secondary, width: 2)
+                          : null,
+                  borderRadius: BorderRadius.circular(100),
+                ),
+                child: CircleAvatar(
+                  radius: 36,
+                  backgroundColor: cs.surfaceDim,
+                  child:
+                      _photoURL != null && _photoURL!.isNotEmpty
+                          ? ClipOval(child: Image.network(_photoURL!))
+                          : Icon(
+                            PhosphorIconsRegular.user,
+                            size: 36,
+                            color: cs.onSurface.withValues(alpha: 0.5),
+                          ),
                 ),
               ),
-              const SizedBox(height: 8),
-              _buildGoogleLinkedSwitch(),
-              const SizedBox(height: 12),
-              ElevatedButton(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Profile saved!")),
-                  );
-                },
-                child: const Text("Save"),
-              ),
-              SizedBox(height: 12),
-              ElevatedButton(
-                style: ButtonStyle(
-                  backgroundColor: WidgetStateProperty.all(
-                    Theme.of(context).scaffoldBackgroundColor,
-                  ),
-                  padding: WidgetStateProperty.all(
-                    const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
-                  ),
-                  shape: WidgetStateProperty.all(
-                    RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(25),
-                      side: BorderSide(
-                        color: Theme.of(context).colorScheme.error,
-                        width: 1,
+              if (_isVip == true)
+                Positioned(
+                  bottom: -6,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: cs.secondary,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Theme.of(context).scaffoldBackgroundColor,
+                        width: 2,
+                      ),
+                    ),
+                    child: Text(
+                      "PRO",
+                      style: TextStyle(
+                        color: cs.onSecondary,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 7,
                       ),
                     ),
                   ),
                 ),
-                onPressed: () async {
-                  try {
-                    final authProvider = Provider.of<AppAuthProvider>(
-                      context,
-                      listen: false,
-                    );
-                    await authProvider.signOut();
-                  } catch (e) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Logout failed: ${e.toString()}')),
-                    );
-                  }
-                },
-                child: Text(
-                  'Logout',
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          _displayName!.isNotEmpty
+              ? Text(
+                _displayName!,
+                style: TextStyle(
+                  color: cs.onSurface,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              )
+              : Text(
+                "Open settings to set your name",
+                style: TextStyle(
+                  color: cs.onSurface,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w200,
+                  fontStyle: FontStyle.italic,
                 ),
               ),
-              const SizedBox(height: 72),
+
+          _username!.isNotEmpty
+              ? Text(
+                _username!,
+                style: TextStyle(
+                  color: cs.onSurface.withValues(alpha: 0.6),
+                  fontSize: 14,
+                ),
+              )
+              : Text(
+                "Open settings to set your username",
+                style: TextStyle(
+                  color: cs.onSurface,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w200,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+          const SizedBox(height: 8),
+
+          // Points Box
+          Container(
+            padding: const EdgeInsets.fromLTRB(6, 6, 12, 6),
+            decoration: BoxDecoration(
+              color: cs.primary.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              spacing: 8,
+              children: [
+                Container(
+                  decoration: BoxDecoration(
+                    color: cs.primary,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: EdgeInsets.all(4),
+                  child: Icon(
+                    PhosphorIconsFill.star,
+                    color: cs.onPrimary,
+                    size: 16,
+                  ),
+                ),
+                Text(
+                  "${_credits ?? 0}",
+                  style: TextStyle(
+                    color: cs.primary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 24),
+
+          // Scrollable content with rounded corners
+          Expanded(
+            child: ShaderMask(
+              shaderCallback: (Rect bounds) {
+                return LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.white,
+                    Colors.white,
+                    Colors.white,
+                    cs.surface.withValues(alpha: 0),
+                  ],
+                  stops: const [0.0, 0, 0.9, 1.0],
+                ).createShader(bounds);
+              },
+              child: Container(
+                clipBehavior: Clip.hardEdge,
+                decoration: BoxDecoration(
+                  color: cs.surface,
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(36),
+                    topRight: Radius.circular(36),
+                  ),
+                ),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // OVERVIEW
+                      Text(
+                        "Overview",
+                        style: TextStyle(
+                          color: cs.onSurface,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 20,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      Row(
+                        children: [
+                          Expanded(
+                            child: SizedBox(
+                              height: 72,
+                              child: _buildOverviewBox(
+                                number: "$_questSets",
+                                label: "Quiz Created",
+                                icon: PhosphorIconsFill.listBullets,
+                                backgroundColor: cs.secondary,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 15),
+                          Expanded(
+                            child: SizedBox(
+                              height: 72,
+                              child: _buildOverviewBox(
+                                number: "$_questAsked",
+                                label: "Quiz Completed",
+                                icon: PhosphorIconsFill.listChecks,
+                                backgroundColor: cs.primary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 15),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: SizedBox(
+                              height: 72,
+                              child: _buildOverviewBox(
+                                number: "$_quizzesDone",
+                                label: "Perfect Quiz",
+                                icon: PhosphorIconsFill.checks,
+                                backgroundColor: cs.tertiary,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 15),
+                          Expanded(
+                            child: SizedBox(
+                              height: 72,
+                              child: _buildOverviewBox(
+                                number: "$_questAnswered",
+                                label: "File Uploaded",
+                                icon: PhosphorIconsFill.files,
+                                backgroundColor: Colors.pinkAccent,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+
+                      // FEATURES
+                      Text(
+                        "Features",
+                        style: TextStyle(
+                          color: cs.onSurface,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      _buildFeatureItem(
+                        icon: PhosphorIconsFill.star,
+                        iconColor: cs.primary,
+                        text: "Buy more credits",
+                        onClick: () {
+                          // TODO: Implement buy credits functionality
+                          // context.pushNamed(AppRoute.buyCredits.name);
+                          print('Buy more credits clicked');
+                        },
+                      ),
+                      const SizedBox(height: 8),
+                      _buildFeatureItem(
+                        icon: PhosphorIconsDuotone.sketchLogo,
+                        iconColor: cs.secondary,
+                        text: "You've been VIP since Jan. 2025",
+                        onClick: () {
+                          // TODO: Implement VIP details functionality
+                          // context.pushNamed(AppRoute.vipDetails.name);
+                          print('VIP details clicked');
+                        },
+                      ),
+                      const SizedBox(height: 8),
+                      _buildFeatureItem(
+                        icon: PhosphorIconsFill.headset,
+                        iconColor: cs.error,
+                        text: "Support",
+                        onClick: () {},
+                      ),
+                      const SizedBox(height: 8),
+                      _buildFeatureItem(
+                        icon: PhosphorIconsFill.shareNetwork,
+                        iconColor: cs.tertiary,
+                        text: "Share the app",
+                        onClick: () {},
+                      ),
+                      const SizedBox(height: 8),
+                      _buildFeatureItem(
+                        icon: PhosphorIconsFill.telegramLogo,
+                        iconColor: cs.primary,
+                        text: "LearnHub on Telegram",
+                        onClick: () {},
+                      ),
+                      const SizedBox(height: 64),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+      extendBody: true,
+    );
+  }
+
+  Widget _buildOverviewBox({
+    required String number,
+    required String label,
+    required IconData icon,
+    required Color backgroundColor,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: backgroundColor.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      clipBehavior: Clip.hardEdge,
+      child: Stack(
+        clipBehavior: Clip.hardEdge,
+        children: [
+          Positioned(
+            top: -10,
+            right: -10,
+            child: Transform.rotate(
+              angle: pi / 8,
+              child: Icon(
+                icon,
+                color: backgroundColor.withValues(alpha: 0.2),
+                size: 56,
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  number,
+                  style: TextStyle(
+                    color: backgroundColor,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 24,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: backgroundColor.withValues(alpha: 0.6),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFeatureItem({
+    required IconData icon,
+    required Color iconColor,
+    required String text,
+    required Function()? onClick,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onClick,
+        borderRadius: BorderRadius.circular(12),
+        splashColor: iconColor.withValues(alpha: 0.2),
+        highlightColor: iconColor.withValues(alpha: 0.1),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: iconColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, color: iconColor, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  text,
+                  style: TextStyle(color: cs.onSurface, fontSize: 14),
+                ),
+              ),
+              Icon(
+                PhosphorIconsRegular.caretRight,
+                color: cs.onSurface.withValues(alpha: 0.4),
+                size: 16,
+              ),
             ],
           ),
         ),
-      ),
-      // bottomNavigationBar: Padding(
-      //   padding: const EdgeInsets.all(16),
-      //   child: SizedBox(
-      //     height: 48,
-      //     width: double.infinity,
-      //     child: ElevatedButton(
-      //       onPressed: () async {
-      //         try {
-      //           final authProvider = Provider.of<AppAuthProvider>(
-      //             context,
-      //             listen: false,
-      //           );
-      //           await authProvider.signOut();
-      //           Navigator.of(context).pushAndRemoveUntil(
-      //             MaterialPageRoute(builder: (context) => WelcomeScreen()),
-      //             (route) => false,
-      //           );
-      //         } catch (e) {
-      //           ScaffoldMessenger.of(context).showSnackBar(
-      //             SnackBar(content: Text('Logout failed: ${e.toString()}')),
-      //           );
-      //         }
-      //       },
-      //       child: Text('Logout'),
-      //     ),
-      //   ),
-      // ),
-    );
-  }
-
-  Widget _buildTextField(
-      String label,
-      TextEditingController controller, {
-        bool readOnly = false,
-        VoidCallback? onTap,
-        TextInputType keyboardType = TextInputType.text,
-      }) {
-    return TextField(
-      controller: controller,
-      readOnly: readOnly,
-      onTap: onTap,
-      keyboardType: keyboardType,
-      style: Theme.of(context).textTheme.bodyLarge,
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: Theme.of(context).textTheme.bodyMedium,
-        filled: true,
-        fillColor: Theme.of(context).colorScheme.surface,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none,
-        ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 14,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildGenderDropdown() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: DropdownButtonFormField<String>(
-        value: _selectedGender,
-        decoration: const InputDecoration(
-          border: InputBorder.none,
-          labelText: "Gender",
-        ),
-        style: Theme.of(context).textTheme.bodyLarge,
-        items: const [
-          DropdownMenuItem(value: "Male", child: Text("Male")),
-          DropdownMenuItem(value: "Female", child: Text("Female")),
-        ],
-        onChanged: (String? newValue) {
-          setState(() {
-            _selectedGender = newValue ?? "Male";
-          });
-        },
-      ),
-    );
-  }
-
-  Widget _buildGoogleLinkedSwitch() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          // Image.asset('../assets/images/google.png', width: 24, height: 24),
-          Icon(PhosphorIconsRegular.googleLogo),
-          const SizedBox(width: 12),
-          Text("Google", style: Theme.of(context).textTheme.bodyLarge),
-          const Spacer(),
-          Switch(
-            value: _googleLinked,
-            activeColor: Theme.of(context).colorScheme.primary,
-            onChanged: (value) {
-              setState(() {
-                _googleLinked = value;
-              });
-            },
-          ),
-        ],
       ),
     );
   }
