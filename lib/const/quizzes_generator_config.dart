@@ -47,6 +47,7 @@ class QuizzesGeneratorConfig {
   final QuizzesDifficulty difficulty;
   final QuizzesLanguage language;
   final int numberOfQuiz;
+  final bool isPublic;
 
   QuizzesGeneratorConfig({
     required this.source,
@@ -55,5 +56,18 @@ class QuizzesGeneratorConfig {
     required this.difficulty,
     required this.numberOfQuiz,
     required this.language,
+    required this.isPublic,
   });
+
+  Map<String, dynamic> toJson() {
+    return {
+      'source': source.name,
+      'type': type.name,
+      'mode': mode.name,
+      'difficulty': difficulty.name,
+      'language': language.name,
+      'numberOfQuiz': numberOfQuiz,
+      'isPublic': isPublic,
+    };
+  }
 }

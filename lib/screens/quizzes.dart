@@ -8,6 +8,9 @@ import 'package:learn_hub/const/search_quiz_config.dart';
 import 'package:learn_hub/models/quiz.dart';
 import 'package:learn_hub/screens/search_quizzes.dart';
 import 'package:learn_hub/services/quiz_manager.dart';
+import 'package:learn_hub/utils/date_helper.dart';
+import 'package:learn_hub/utils/string_helpers.dart';
+import 'package:moment_dart/moment_dart.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 final Map<String, PhosphorIconData> subjectCategories = {
@@ -35,6 +38,12 @@ final difficultyColors = {
   'hard': Colors.red,
   'all': Colors.blue,
   'unknown': Colors.grey,
+};
+
+final difficultyShortDescriptions = {
+  DifficultyLevel.easy: "Some simple questions to get you started.",
+  DifficultyLevel.medium: "Moderate questions to challenge your knowledge.",
+  DifficultyLevel.hard: "Advanced questions for the experts.",
 };
 
 class QuizzesScreen extends StatefulWidget {
@@ -101,9 +110,9 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
     if (mounted) setState(() {});
 
     final config = SearchQuizConfig(
+      includeUserId: true,
       searchText: "",
-      isPublic: true,
-      size: 5,
+      size: 8,
       start: 0,
       minCreatedDate: DateFormat(
         'dd/MM/yyyy',
@@ -113,6 +122,11 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
     recentQuizzes = await fetchQuizzes(
       config: config,
       errorMessage: "Error fetching recent quizzes",
+    );
+    recentQuizzes.sort(
+      (a, b) => DateTime.parse(
+        b['created_date'],
+      ).compareTo(DateTime.parse(a['created_date'])),
     );
 
     isLoadingRecent = false;
@@ -126,6 +140,7 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
     // Note: Assuming there's a way to filter favorite quizzes
     // You might need to update this based on your backend API
     final config = SearchQuizConfig(
+      includeUserId: true,
       searchText: "",
       isPublic: false,
       size: 5,
@@ -150,6 +165,7 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
 
     for (final category in categories) {
       final config = SearchQuizConfig(
+        includeUserId: false,
         searchText: "",
         isPublic: true,
         size: 5,
@@ -176,22 +192,20 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
     if (mounted) setState(() {});
 
     difficultyQuizzes = {};
-    final difficulties = ["Easy", "Medium", "Hard"];
+    final difficulties = [
+      DifficultyLevel.easy,
+      DifficultyLevel.medium,
+      DifficultyLevel.hard,
+    ];
 
     for (final difficulty in difficulties) {
-      final difficultyLevel =
-          difficulty == "Easy"
-              ? DifficultyLevel.easy
-              : difficulty == "Medium"
-              ? DifficultyLevel.medium
-              : DifficultyLevel.hard;
-
       final config = SearchQuizConfig(
+        includeUserId: false,
         searchText: "",
         isPublic: true,
         size: 5,
         start: 0,
-        difficulty: difficultyLevel,
+        difficulty: difficulty,
       );
 
       final quizzes = await fetchQuizzes(
@@ -200,7 +214,7 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
       );
 
       if (quizzes.isNotEmpty) {
-        difficultyQuizzes[difficulty] = quizzes;
+        difficultyQuizzes[difficulty.name] = quizzes;
       }
     }
 
@@ -253,8 +267,9 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
                           widget.quizList!.isNotEmpty)
                         _buildNewlyGeneratedQuizzes(),
                       _buildRecentQuizzes(),
-                      _buildFavoriteQuizzes(),
-                      _buildCategorizedQuizzes(),
+                      // _buildFavoriteQuizzes(),
+                      // _buildCategorizedQuizzes(),
+                      _buildCategories(),
                       _buildDifficultyLevelQuizzes(),
                     ],
                   ),
@@ -265,83 +280,6 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
         ),
       ),
 
-      // floatingActionButton: Padding(
-      //   padding: const EdgeInsets.only(bottom: 72.0),
-      //   child: FloatingActionButton.extended(
-      //     onPressed: () {
-      //       showGeneralDialog(
-      //         context: context,
-      //         barrierDismissible: true,
-      //         barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
-      //         barrierColor: Colors.black54,
-      //         transitionDuration: const Duration(milliseconds: 300),
-      //         pageBuilder: (context, animation, secondaryAnimation) {
-      //           return const GenerateQuizzesScreen();
-      //         },
-      //         transitionBuilder: (context, animation, secondaryAnimation, child) {
-      //           final curvedAnimation = CurvedAnimation(
-      //             parent: animation,
-      //             curve: Curves.easeInOut,
-      //           );
-      //
-      //           return FadeTransition(
-      //             opacity: Tween<double>(begin: 0.0, end: 1.0).animate(curvedAnimation),
-      //             child: ScaleTransition(
-      //               scale: Tween<double>(begin: 0.9, end: 1).animate(curvedAnimation),
-      //               child: child,
-      //             ),
-      //           );
-      //         },
-      //       );
-      //     },
-      //     backgroundColor: cs.primary,
-      //     foregroundColor: cs.onPrimary,
-      //     icon: const Icon(PhosphorIconsRegular.plus),
-      //     label: const Text("Create Quiz"),
-      //     shape: RoundedRectangleBorder(
-      //       borderRadius: BorderRadius.circular(30),
-      //     ),
-      //   ),
-      // ),
-
-      // floatingActionButton: Padding(
-      //   padding: const EdgeInsets.only(bottom: 72.0),
-      //   child: OpenContainer(
-      //     routeSettings: RouteSettings(name: AppRoute.generateQuiz.name),
-      //     openBuilder: (BuildContext context, VoidCallback _) {
-      //       if (mounted) {
-      //         Future.microtask(
-      //           () => context.pushNamed(AppRoute.generateQuiz.name),
-      //         );
-      //       }
-      //       // Return an empty container as we're handling navigation differently
-      //       return Container(color: Theme.of(context).scaffoldBackgroundColor);
-      //     },
-      //     openColor: cs.surface,
-      //     closedElevation: 0,
-      //     openElevation: 0,
-      //     middleColor: Colors.transparent,
-      //     closedShape: const RoundedRectangleBorder(
-      //       borderRadius: BorderRadius.all(Radius.circular(25)),
-      //     ),
-      //     transitionType: ContainerTransitionType.fade,
-      //     transitionDuration: Duration(milliseconds: 500),
-      //     closedColor: Colors.transparent,
-      //     closedBuilder: (BuildContext context, VoidCallback openContainer) {
-      //       return FloatingActionButton.extended(
-      //         onPressed: openContainer,
-      //         backgroundColor: cs.primary,
-      //         foregroundColor: cs.onPrimary,
-      //         icon: const Icon(PhosphorIconsRegular.plus),
-      //         label: const Text("Create Quiz"),
-      //         shape: RoundedRectangleBorder(
-      //           borderRadius: BorderRadius.circular(30),
-      //         ),
-      //       );
-      //     },
-      //   ),
-      // ),
-      //
       floatingActionButton: Padding(
         padding: const EdgeInsets.only(bottom: 72.0),
         child: FloatingActionButton.extended(
@@ -357,27 +295,6 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
           ),
         ),
       ),
-
-      // Padding(
-      //   padding: EdgeInsets.only(bottom: 96),
-      //   child: FloatingActionButton.extended(
-      //     onPressed: () {
-      //       Navigator.push(
-      //         context,
-      //         MaterialPageRoute(
-      //           builder: (context) => const GenerateQuizzesScreen(),
-      //         ),
-      //       );
-      //     },
-      //     backgroundColor: cs.primary,
-      //     foregroundColor: cs.onPrimary,
-      //     icon: const Icon(PhosphorIconsRegular.plus),
-      //     label: const Text("Create Quiz"),
-      //     shape: RoundedRectangleBorder(
-      //       borderRadius: BorderRadius.circular(30)
-      //     ),
-      //   ),
-      // ),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
@@ -424,11 +341,11 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
           ElevatedButton.icon(
             style: ButtonStyle(
               backgroundColor: WidgetStatePropertyAll(cs.primary),
-              padding: WidgetStatePropertyAll(EdgeInsets.symmetric(vertical: 12, horizontal: 20)),
+              padding: WidgetStatePropertyAll(
+                EdgeInsets.symmetric(vertical: 12, horizontal: 20),
+              ),
               shape: WidgetStatePropertyAll(
-                RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
             ),
             onPressed: () {
@@ -437,8 +354,8 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
                 extra: SearchQuizzesExtra(
                   title: Text("Search"),
                   searchConfig: SearchQuizConfig(
+                    includeUserId: true,
                     searchText: _searchController.value.text,
-                    isPublic: false,
                     size: 10,
                     start: 0,
                   ),
@@ -478,6 +395,7 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
                     extra: SearchQuizzesExtra(
                       title: Text('Generated Quizzes'),
                       searchConfig: SearchQuizConfig(
+                        includeUserId: true,
                         searchText: "",
                         isPublic: true,
                         size: 5,
@@ -648,6 +566,7 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
                     extra: SearchQuizzesExtra(
                       title: Text('Recent Quizzes'),
                       searchConfig: SearchQuizConfig(
+                        includeUserId: true,
                         searchText: "",
                         isPublic: true,
                         size: 5,
@@ -675,6 +594,10 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
                     itemCount: recentQuizzes.length,
                     itemBuilder: (context, index) {
                       final quiz = recentQuizzes[index];
+                      if (quiz['created_date'] != null) {
+                        quiz['subtitle'] =
+                            'Created ${Moment(DateHelper.utcStringToLocal(quiz['created_date'])).fromNow()}';
+                      }
                       return _buildQuizCard(quiz);
                     },
                   ),
@@ -724,6 +647,7 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
                         ],
                       ),
                       searchConfig: SearchQuizConfig(
+                        includeUserId: true,
                         searchText: "",
                         isPublic: false,
                         size: 5,
@@ -790,6 +714,76 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
     );
   }
 
+  Widget _buildCategories() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
+          child: Text(
+            "Categories",
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              fontFamily: 'BricolageGrotesque',
+              color: cs.onSurface,
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children:
+                availableCategories.map((category) {
+                  return _buildCategoryButton(category);
+                }).toList(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCategoryButton(Map<String, dynamic> category) {
+    return GestureDetector(
+      onTap: () {
+        context.pushNamed(
+          AppRoute.searchQuizzes.name,
+          extra: SearchQuizzesExtra(
+            title: Text('${category['icon']}  ${category['name']}'),
+            searchConfig: SearchQuizConfig(
+              includeUserId: false,
+              searchText: "",
+              isPublic: true,
+              categories: [category['name']],
+              size: 5,
+              start: 0,
+            ),
+          ),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: cs.surface.withValues(alpha: 0.5),
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: cs.shadow.withValues(alpha: 0.088),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Text(
+          '${category['icon']}  ${category['name']}',
+          style: TextStyle(color: cs.onSurface),
+        ),
+      ),
+    );
+  }
+
   Widget _buildCategorySection(
     String category,
     List<Map<String, dynamic>> quizList,
@@ -849,7 +843,7 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
           child: Text(
-            "By DifficultyLevel",
+            "By Difficulty",
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
@@ -862,21 +856,21 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
           children: [
             Expanded(
               child: _buildDifficultyLevelCard(
-                "Easy",
+                DifficultyLevel.easy,
                 Colors.green,
                 PhosphorIconsRegular.lightbulb,
               ),
             ),
             Expanded(
               child: _buildDifficultyLevelCard(
-                "Medium",
+                DifficultyLevel.medium,
                 Colors.orange,
                 PhosphorIconsRegular.puzzlePiece,
               ),
             ),
             Expanded(
               child: _buildDifficultyLevelCard(
-                "Hard",
+                DifficultyLevel.hard,
                 Colors.red,
                 PhosphorIconsRegular.brain,
               ),
@@ -887,7 +881,11 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
     );
   }
 
-  Widget _buildDifficultyLevelCard(String level, Color color, IconData icon) {
+  Widget _buildDifficultyLevelCard(
+    DifficultyLevel level,
+    Color color,
+    IconData icon,
+  ) {
     return Container(
       height: 120,
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -897,7 +895,18 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
       ),
       child: InkWell(
         onTap: () {
-          // Navigate to DifficultyLevel filtered quizList
+          context.pushNamed(
+            AppRoute.searchQuizzes.name,
+            extra: SearchQuizzesExtra(
+              title: Text('${StringHelpers.capitalize(level.name)} Quizzes'),
+              searchConfig: SearchQuizConfig(
+                includeUserId: false,
+                searchText: "",
+                difficulty: level,
+              ),
+              showSearchBar: true,
+            ),
+          );
         },
         borderRadius: BorderRadius.circular(16),
         child: Column(
@@ -906,20 +915,20 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
             Icon(icon, color: color, size: 24),
             const SizedBox(height: 8),
             Text(
-              level,
+              StringHelpers.capitalize(level.name),
               style: TextStyle(fontWeight: FontWeight.bold, color: color),
             ),
-            Text(
-              "${level == 'Easy'
-                  ? 10
-                  : level == 'Medium'
-                  ? 15
-                  : 8} quizList",
-              style: TextStyle(
-                fontSize: 12,
-                color: color.withValues(alpha: 0.8),
-              ),
-            ),
+            // Text(
+            //   "${level == 'Easy'
+            //       ? 10
+            //       : level == 'Medium'
+            //       ? 15
+            //       : 8} quizList",
+            //   style: TextStyle(
+            //     fontSize: 12,
+            //     color: color.withValues(alpha: 0.8),
+            //   ),
+            // ),
           ],
         ),
       ),
@@ -976,12 +985,12 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
                   fontSize: 16,
                   color: cs.onSurface,
                 ),
-                maxLines: 2,
+                maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: 4),
               Text(
-                quiz['description'] ?? "No description available",
+                quiz['subtitle'] ?? "No description available",
                 style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,

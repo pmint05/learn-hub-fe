@@ -274,18 +274,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             ),
                   ),
                 ),
-                Container(
-                  width: 24,
-                  height: 24,
-                  margin: const EdgeInsets.only(bottom: 2, right: 2),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primary,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.camera_alt,
-                    size: 16,
-                    color: Colors.white,
+                GestureDetector(
+                  onTap: _pickAndPreview,
+                  child: Container(
+                    width: 24,
+                    height: 24,
+                    margin: const EdgeInsets.only(bottom: 2, right: 2),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primary,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.camera_alt,
+                      size: 16,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
               ],

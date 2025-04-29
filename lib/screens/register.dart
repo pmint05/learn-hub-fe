@@ -159,15 +159,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               ),
                               suffixIcon: _isCheckingUsername
                                   ? SizedBox(
-                                width: 12,
-                                height: 12,
-                                child: CircularProgressIndicator(
-                                  constraints: BoxConstraints(
-                                    maxWidth: 12,
-                                    maxHeight: 12,
+                                width: 16,
+                                height: 16,
+                                child: Padding(
+                                  padding: const EdgeInsets.all(12.0),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: cs.primary,
                                   ),
-                                  strokeWidth: 2,
-                                  color: cs.primary,
                                 ),
                               )
                                   : _usernameError == null && _usernameController.text.isNotEmpty

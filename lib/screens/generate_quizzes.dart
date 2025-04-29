@@ -9,11 +9,35 @@ import 'package:image_picker/image_picker.dart';
 import 'package:learn_hub/configs/router_config.dart';
 import 'package:learn_hub/const/quizzes_generator_config.dart';
 import 'package:learn_hub/services/quizzes_generator.dart';
-import 'package:learn_hub/utils/api_helper.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 // import 'package:learn_hub/widgets/select_menu_tile.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+
+final statusColors = {
+  "pending": Colors.yellow,
+  "processing": Colors.blue,
+  "completed": Colors.green,
+  "failed": Colors.red,
+  "error": Colors.red,
+};
+
+final fileIcons = {
+  "pdf": PhosphorIconsLight.filePdf,
+  "docx": PhosphorIconsLight.fileText,
+  "doc": PhosphorIconsLight.fileDoc,
+  "txt": PhosphorIconsLight.fileTxt,
+  "md": PhosphorIconsLight.fileMd,
+};
+
+final taskStatusesMessage = {
+  "pending": "Your quiz will be generated soon.",
+  "processing": "Your quiz is being processed.",
+  "completed": "Your quiz is ready to use.",
+  "not_found": "Task not found.",
+  "failed": "Failed to generate quiz.",
+  "error": "An error occurred while generating the quiz.",
+};
 
 class GenerateQuizzesScreen extends StatefulWidget {
   const GenerateQuizzesScreen({super.key});
@@ -91,41 +115,18 @@ class _GenerateQuizzesScreenState extends State<GenerateQuizzesScreen>
   QuizzesMode selectedMode = QuizzesMode.quiz;
   QuizzesDifficulty selectedDifficulty = QuizzesDifficulty.medium;
   int quizCount = -1;
+  bool isPublic = false;
 
   final int maxCount = 30;
 
   final QuizzesGenerator _quizGenerator = QuizzesGenerator();
-  final statusColors = {
-    "pending": Colors.yellow,
-    "processing": Colors.blue,
-    "completed": Colors.green,
-    "failed": Colors.red,
-    "error": Colors.red,
-  };
-
-  final fileIcons = {
-    "pdf": PhosphorIconsLight.filePdf,
-    "docx": PhosphorIconsLight.fileText,
-    "doc": PhosphorIconsLight.fileDoc,
-    "txt": PhosphorIconsLight.fileTxt,
-    "md": PhosphorIconsLight.fileMd,
-  };
-
-  final taskStatusesMessage = {
-    "pending": "Your quiz will be generated soon.",
-    "processing": "Your quiz is being processed.",
-    "completed": "Your quiz is ready to use.",
-    "not_found": "Task not found.",
-    "failed": "Failed to generate quiz.",
-    "error": "An error occurred while generating the quiz.",
-  };
 
   final _formKey = GlobalKey<FormState>();
 
   Future<void> _pickFile() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['pdf', 'docx', 'doc', 'txt', 'md'],
+      allowedExtensions: ['pdf', 'docx', 'txt', 'md'],
       withData: true,
     );
 
@@ -246,18 +247,14 @@ class _GenerateQuizzesScreenState extends State<GenerateQuizzesScreen>
             sourceType = QuizzesSource.file;
             file = _selectedFile;
             info = _selectedFileInfo;
-            break;
           case 1:
             sourceType = QuizzesSource.text;
-            break;
           case 2:
             sourceType = QuizzesSource.image;
             file = _selectedImageFile;
             info = _selectedImageInfo;
-            break;
           case 3:
             sourceType = QuizzesSource.link;
-            break;
           default:
             sourceType = QuizzesSource.file;
         }
@@ -269,6 +266,7 @@ class _GenerateQuizzesScreenState extends State<GenerateQuizzesScreen>
           difficulty: difficultyController.value,
           numberOfQuiz: int.parse(quizCountController.text),
           language: languageController.value,
+          isPublic: isPublic
         );
 
         await _quizGenerator.createQuizzesTask(
@@ -1069,6 +1067,7 @@ class _GenerateQuizzesScreenState extends State<GenerateQuizzesScreen>
                             difficultyController,
                             PhosphorIconsRegular.chartBar,
                           ),
+                          _buildPrivacySwitcher(cs),
                         ],
                       ),
                     ),
@@ -1170,6 +1169,53 @@ class _GenerateQuizzesScreenState extends State<GenerateQuizzesScreen>
       },
       initialSelection: valueController.value,
       dropdownMenuEntries: entries,
+    );
+  }
+
+  Widget _buildPrivacySwitcher(ColorScheme cs) {
+    WidgetStateProperty<Color?> trackColor =
+        WidgetStateProperty<Color?>.fromMap(<WidgetStatesConstraint, Color>{
+          WidgetState.selected: Theme.of(context).colorScheme.primary,
+          WidgetState.disabled: Colors.grey.shade400,
+          WidgetState.scrolledUnder: Colors.grey.shade400,
+        });
+    final WidgetStateProperty<Color?> overlayColor =
+        WidgetStateProperty<Color?>.fromMap(<WidgetState, Color>{
+          WidgetState.selected: Theme.of(
+            context,
+          ).colorScheme.primary.withValues(alpha: 0.54),
+          WidgetState.disabled: Colors.grey.shade400,
+        });
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(PhosphorIconsRegular.globe, size: 24),
+          const SizedBox(width: 12),
+          Text(
+            "Publish this quiz?",
+            style: Theme.of(context).textTheme.bodyLarge,
+          ),
+
+          const Spacer(),
+          Switch(
+            overlayColor: overlayColor,
+            trackColor: trackColor,
+            thumbColor: WidgetStatePropertyAll<Color>(cs.onSurface),
+            value: isPublic,
+            activeColor: Theme.of(context).colorScheme.primary,
+            onChanged: (value) {
+              setState(() {
+                isPublic = value;
+              });
+            },
+          ),
+        ],
+      ),
     );
   }
 

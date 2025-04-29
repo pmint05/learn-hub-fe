@@ -2,7 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:go_router/go_router.dart';
 import 'package:learn_hub/configs/router_config.dart';
+import 'package:learn_hub/const/constants.dart';
 import 'package:learn_hub/const/search_quiz_config.dart';
+import 'package:learn_hub/models/quiz.dart';
+import 'package:learn_hub/services/quiz_manager.dart';
+import 'package:learn_hub/utils/string_helpers.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 class SearchQuizzesExtra {
@@ -27,23 +31,43 @@ class SearchQuizzesScreen extends StatefulWidget {
 }
 
 class _SearchQuizzesScreenState extends State<SearchQuizzesScreen> {
-  final TextEditingController _searchController = TextEditingController();
   late ColorScheme cs = Theme.of(context).colorScheme;
+
+  final _pageSize = 10;
+  int? _currentPage = 0;
+  bool? _canLoadMore = true;
   bool _isLoading = true;
+  bool _isLoadingMore = false;
   String? _error;
+  DifficultyLevel? _selectedDifficulty;
+  List<String> _selectedCategories = [];
+  late SearchQuizConfig _currentSearchConfig;
+
   List<Map<String, dynamic>> _quizzes = [];
+
+  final TextEditingController _searchController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
-    _fetchQuizzes();
+    _currentSearchConfig = widget.searchExtra.searchConfig;
+    _selectedDifficulty = _currentSearchConfig.difficulty;
+    _selectedCategories = _currentSearchConfig.categories ?? [];
     if (widget.searchExtra.showSearchBar ?? false) {
-      _searchController.text = widget.searchExtra.searchConfig.searchText!;
-      _searchController.addListener(() {
-        setState(() {
-          _quizzes = _getMockQuizzesBySearch(_searchController.text);
-        });
-      });
+      _searchController.text = _currentSearchConfig.searchText ?? "";
+    }
+    _scrollController.addListener(_onScroll);
+    _searchQuiz(reset: true);
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+            _scrollController.position.maxScrollExtent - 200 &&
+        !_isLoading &&
+        !_isLoadingMore &&
+        _canLoadMore!) {
+      _loadMoreQuiz();
     }
   }
 
@@ -56,29 +80,78 @@ class _SearchQuizzesScreenState extends State<SearchQuizzesScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
-  Future<void> _fetchQuizzes() async {
+  Future<void> _searchQuiz({bool reset = false}) async {
+    if (reset) {
+      setState(() {
+        _currentPage = 0;
+        _quizzes.clear();
+        _canLoadMore = true;
+      });
+    }
+
     setState(() {
-      _isLoading = true;
+      _isLoading = reset;
       _error = null;
     });
 
     try {
-      // Simulate API call with delay
-      await Future.delayed(const Duration(seconds: 1));
+      final config = SearchQuizConfig(
+        includeUserId: _currentSearchConfig.includeUserId,
+        searchText: _searchController.text.trim(),
+        isPublic: _currentSearchConfig.isPublic,
+        categories: _selectedCategories.isNotEmpty ? _selectedCategories : null,
+        difficulty: _selectedDifficulty,
+        size: _pageSize,
+        start: _currentPage! * _pageSize,
+      );
 
-      _quizzes = _getMockAllQuizzes();
+      final response = await QuizManager.instance.getQuizzes(config: config);
 
-      setState(() {
-        _isLoading = false;
-      });
+      if (response['status'] == 'success' && response['data'] != null) {
+        final newQuizzes = List<Map<String, dynamic>>.from(response['data']);
+        print('Got total ${response['total']} quizzes');
+
+        setState(() {
+          if (reset) {
+            _quizzes = newQuizzes;
+          } else {
+            _quizzes.addAll(newQuizzes);
+          }
+          _isLoading = false;
+          _isLoadingMore = false;
+          _canLoadMore = response['total'] == _pageSize;
+        });
+      } else {
+        print("Error fetching quizzes: ${response['message']}");
+        print(response);
+        print(config.toJson());
+        setState(() {
+          _isLoading = false;
+          _isLoadingMore = false;
+          _error = "Failed to load quizzes: ${response['message']}";
+        });
+      }
     } catch (e) {
+      print("Error fetching quizzes: $e");
       setState(() {
         _isLoading = false;
+        _isLoadingMore = false;
         _error = "Failed to load quizzes: $e";
       });
+    }
+  }
+
+  void _loadMoreQuiz() async {
+    if (_canLoadMore!) {
+      setState(() {
+        _isLoadingMore = true;
+        _currentPage = _currentPage! + 1;
+      });
+      await _searchQuiz();
     }
   }
 
@@ -111,8 +184,7 @@ class _SearchQuizzesScreenState extends State<SearchQuizzesScreen> {
     if (_isLoading) {
       return Column(
         children: [
-          if (widget.searchExtra.showSearchBar ?? false)
-            _buildSearchBar(),
+          if (widget.searchExtra.showSearchBar ?? false) _buildSearchBar(),
           Expanded(child: const Center(child: CircularProgressIndicator())),
         ],
       );
@@ -135,7 +207,7 @@ class _SearchQuizzesScreenState extends State<SearchQuizzesScreen> {
             ),
             const SizedBox(height: 24),
             ElevatedButton.icon(
-              onPressed: _fetchQuizzes,
+              onPressed: () => _searchQuiz(reset: true),
               icon: const Icon(PhosphorIconsRegular.arrowClockwise),
               label: const Text("Try Again"),
             ),
@@ -147,8 +219,7 @@ class _SearchQuizzesScreenState extends State<SearchQuizzesScreen> {
     if (_quizzes.isEmpty) {
       return Column(
         children: [
-          if (widget.searchExtra.showSearchBar ?? false)
-            _buildSearchBar(),
+          if (widget.searchExtra.showSearchBar ?? false) _buildSearchBar(),
           Expanded(
             child: Center(
               child: Column(
@@ -178,11 +249,10 @@ class _SearchQuizzesScreenState extends State<SearchQuizzesScreen> {
 
     return Column(
       children: [
-        if (widget.searchExtra.showSearchBar ?? false)
-          _buildSearchBar(),
+        if (widget.searchExtra.showSearchBar ?? false) _buildSearchBar(),
         Expanded(
           child: RefreshIndicator(
-            onRefresh: _fetchQuizzes,
+            onRefresh: _searchQuiz,
             child: AnimationLimiter(
               child: ListView.builder(
                 padding: const EdgeInsets.all(16),
@@ -191,13 +261,23 @@ class _SearchQuizzesScreenState extends State<SearchQuizzesScreen> {
                   parent: BouncingScrollPhysics(),
                 ),
                 itemBuilder: (context, index) {
+                  if (index == _quizzes.length) {
+                    return Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: CircularProgressIndicator(),
+                      ),
+                    );
+                  }
                   final quiz = _quizzes[index];
                   return AnimationConfiguration.staggeredList(
                     position: index,
                     duration: const Duration(milliseconds: 400),
                     child: SlideAnimation(
                       horizontalOffset: 50,
-                      child: FadeInAnimation(child: _buildQuizCard(context, quiz)),
+                      child: FadeInAnimation(
+                        child: _buildQuizCard(context, quiz),
+                      ),
                     ),
                   );
                 },
@@ -210,123 +290,203 @@ class _SearchQuizzesScreenState extends State<SearchQuizzesScreen> {
   }
 
   void _showFilterBottomSheet() {
+    List<String> tempCategories = List.from(_selectedCategories);
+    DifficultyLevel? tempDifficulty = _selectedDifficulty;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder:
-          (context) => Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: cs.surface,
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(20),
-              ),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: cs.onSurface.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
+          (context) => StatefulBuilder(
+            builder: (context, setModalState) {
+              return Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: cs.surface,
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(20),
                   ),
                 ),
-                const SizedBox(height: 20),
-                Text(
-                  "Filter Quizzes",
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: cs.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  "Difficulty",
-                  style: TextStyle(
-                    fontWeight: FontWeight.w500,
-                    color: cs.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildFilterChip("Easy", true),
-                    _buildFilterChip("Medium", false),
-                    _buildFilterChip("Hard", false),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  "Categories",
-                  style: TextStyle(
-                    fontWeight: FontWeight.w500,
-                    color: cs.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  children: [
-                    _buildFilterChip("Science", true),
-                    _buildFilterChip("Math", false),
-                    _buildFilterChip("Language", false),
-                    _buildFilterChip("History", false),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () {
-                          Navigator.pop(context);
-                        },
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          side: BorderSide(color: cs.primary),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: Text(
-                          "Reset",
-                          style: TextStyle(color: cs.primary),
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: cs.onSurface.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(2),
                         ),
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: FilledButton(
-                        onPressed: () {
-                          Navigator.pop(context);
-                          _fetchQuizzes();
-                        },
-                        style: FilledButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          backgroundColor: cs.primary,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: Text(
-                          "Apply",
-                          style: TextStyle(color: cs.onPrimary),
-                        ),
+                    const SizedBox(height: 20),
+                    Text(
+                      "Filter Quizzes",
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: cs.onSurface,
                       ),
                     ),
+                    const SizedBox(height: 16),
+                    Text(
+                      "Difficulty",
+                      style: TextStyle(
+                        fontWeight: FontWeight.w500,
+                        color: cs.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      children:
+                          DifficultyLevel.values
+                              .where(
+                                (d) =>
+                                    d != DifficultyLevel.unknown &&
+                                    d != DifficultyLevel.all,
+                              )
+                              .map(
+                                (difficulty) => FilterChip(
+                                  label: Text(
+                                    StringHelpers.capitalize(difficulty.name),
+                                  ),
+                                  selected: tempDifficulty == difficulty,
+                                  onSelected: (selected) {
+                                    setModalState(() {
+                                      tempDifficulty =
+                                          selected ? difficulty : null;
+                                    });
+                                  },
+                                  backgroundColor: cs.surface,
+                                  labelStyle: TextStyle(
+                                    color:
+                                        tempDifficulty == difficulty
+                                            ? cs.primary
+                                            : cs.onSurfaceVariant,
+                                  ),
+                                  selectedColor: cs.primary.withValues(
+                                    alpha: 0.2,
+                                  ),
+                                  checkmarkColor: cs.primary,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                    side: BorderSide(
+                                      color:
+                                          tempDifficulty == difficulty
+                                              ? cs.primary
+                                              : cs.surfaceDim,
+                                    ),
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      "Categories",
+                      style: TextStyle(
+                        fontWeight: FontWeight.w500,
+                        color: cs.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      children:
+                          availableCategories.map((category) {
+                            final isSelected = tempCategories.contains(
+                              category['name'] as String,
+                            );
+                            return FilterChip(
+                              label: Text(category['name'] as String),
+                              selected: isSelected,
+                              onSelected: (selected) {
+                                setModalState(() {
+                                  if (selected) {
+                                    tempCategories.add(category['name'] as String);
+                                  } else {
+                                    tempCategories.remove(category['name'] as String,);
+                                  }
+                                });
+                              },
+                              backgroundColor: cs.surface,
+                              labelStyle: TextStyle(
+                                color:
+                                    isSelected
+                                        ? cs.primary
+                                        : cs.onSurfaceVariant,
+                              ),
+                              selectedColor: cs.primary.withValues(alpha: 0.2),
+                              checkmarkColor: cs.primary,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                side: BorderSide(
+                                  color:
+                                      isSelected ? cs.primary : cs.surfaceDim,
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                    ),
+                    const SizedBox(height: 24),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () {
+                              setModalState(() {
+                                tempCategories.clear();
+                                tempDifficulty = null;
+                              });
+                            },
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              side: BorderSide(color: cs.primary),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: Text(
+                              "Reset",
+                              style: TextStyle(color: cs.primary),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: FilledButton(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              setState(() {
+                                _selectedCategories = tempCategories;
+                                _selectedDifficulty = tempDifficulty;
+                              });
+                              _searchQuiz(reset: true);
+                            },
+                            style: FilledButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              backgroundColor: cs.primary,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: Text(
+                              "Apply",
+                              style: TextStyle(color: cs.onPrimary),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: MediaQuery.of(context).padding.bottom),
                   ],
                 ),
-                SizedBox(height: MediaQuery.of(context).padding.bottom),
-              ],
-            ),
+              );
+            },
           ),
     );
   }
@@ -336,10 +496,13 @@ class _SearchQuizzesScreenState extends State<SearchQuizzesScreen> {
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
       child: TextField(
         controller: _searchController,
-        onChanged: (value) {
-          setState(() {
-            _quizzes = _getMockQuizzesBySearch(value);
-          });
+        // onChanged: (value) {
+        //   setState(() {
+        //     _quizzes = _getMockQuizzesBySearch(value);
+        //   });
+        // },
+        onSubmitted: (value) {
+          _searchQuiz(reset: true);
         },
         decoration: InputDecoration(
           hintText: "Search quizzes...",
@@ -372,7 +535,13 @@ class _SearchQuizzesScreenState extends State<SearchQuizzesScreen> {
   }
 
   Widget _buildQuizCard(BuildContext context, Map<String, dynamic> quiz) {
-    final diffColor = _getDifficultyColor(quiz['difficulty'], context);
+    final diffColor = _getDifficultyColor(
+      DifficultyLevel.values.firstWhere(
+        (e) => e.name == quiz['difficulty'].toString().toLowerCase(),
+        orElse: () => DifficultyLevel.unknown,
+      ),
+      context,
+    );
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
@@ -383,34 +552,10 @@ class _SearchQuizzesScreenState extends State<SearchQuizzesScreen> {
       ),
       child: InkWell(
         onTap: () {
-          if (quiz.containsKey('questionCount')) {
-            // For sample data, generate mock questions
-            final mockQuestions = List.generate(
-              quiz['questionCount'],
-              (index) => {
-                'question':
-                    'Sample question ${index + 1} for ${quiz['title']}?',
-                'options': ['Option A', 'Option B', 'Option C', 'Option D'],
-                'answer': index % 4,
-                'explanation':
-                    'This is the explanation for question ${index + 1}.',
-              },
-            );
-
-            context.pushNamed(
-              AppRoute.doQuizzes.name,
-              extra: {'quizzes': mockQuestions, 'prevRoute': null},
-            );
-          } else {
-            // If it's already a quiz with questions format
-            context.pushNamed(
-              AppRoute.doQuizzes.name,
-              extra: {
-                'quizzes': [quiz],
-                'prevRoute': null,
-              },
-            );
-          }
+          context.pushNamed(
+            AppRoute.doQuizzes.name,
+            extra: {'quiz': Quiz.fromJson(quiz), 'prevRoute': null},
+          );
         },
         borderRadius: BorderRadius.circular(16),
         child: Padding(
@@ -426,7 +571,7 @@ class _SearchQuizzesScreenState extends State<SearchQuizzesScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          quiz['title'],
+                          quiz['title'] ?? 'Untitled Quiz',
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
@@ -453,6 +598,14 @@ class _SearchQuizzesScreenState extends State<SearchQuizzesScreen> {
                   ),
                 ],
               ),
+              const SizedBox(height: 8),
+              if (quiz.containsKey('categories') && quiz['categories'].isNotEmpty)
+                Text(quiz['categories'].join(', '),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: cs.primary,
+                      fontStyle: FontStyle.italic
+                    )),
               const SizedBox(height: 12),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -468,30 +621,11 @@ class _SearchQuizzesScreenState extends State<SearchQuizzesScreen> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
-                        quiz['difficulty'],
+                        StringHelpers.capitalize(quiz['difficulty']),
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w500,
                           color: diffColor,
-                        ),
-                      ),
-                    ),
-                  if (quiz.containsKey('tag'))
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: cs.primaryContainer.withValues(alpha: 0.3),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        quiz['tag'],
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                          color: cs.primary,
                         ),
                       ),
                     ),
@@ -506,7 +640,7 @@ class _SearchQuizzesScreenState extends State<SearchQuizzesScreen> {
                       border: Border.all(color: cs.surfaceDim),
                     ),
                     child: Text(
-                      "${quiz['questionCount'] ?? quiz.length} Q",
+                      "${quiz['num_question'] ?? quiz.length} Q",
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
@@ -523,143 +657,15 @@ class _SearchQuizzesScreenState extends State<SearchQuizzesScreen> {
     );
   }
 
-  Color _getDifficultyColor(dynamic difficulty, BuildContext context) {
-    if (difficulty == null) return cs.primary;
-    return difficulty == 'Easy'
+  Color _getDifficultyColor(DifficultyLevel difficulty, BuildContext context) {
+    return difficulty == DifficultyLevel.easy
         ? Colors.green
-        : difficulty == 'Medium'
+        : difficulty == DifficultyLevel.medium
         ? Colors.orange
-        : Colors.red;
-  }
-
-  // Mock data methods
-  List<Map<String, dynamic>> _getMockAllQuizzes() {
-    return List.generate(
-      10,
-      (index) => {
-        'id': 'quiz_$index',
-        'title': 'Quiz ${index + 1}',
-        'description': 'This is a sample quiz with random questions',
-        'difficulty':
-            index % 3 == 0
-                ? 'Easy'
-                : index % 3 == 1
-                ? 'Medium'
-                : 'Hard',
-        'questionCount': 10 + index,
-        'tag':
-            index % 4 == 0
-                ? 'Science'
-                : index % 4 == 1
-                ? 'Math'
-                : index % 4 == 2
-                ? 'Language'
-                : 'History',
-      },
-    );
-  }
-
-  List<Map<String, dynamic>> _getMockQuizzesByCategory(String category) {
-    return List.generate(
-      5,
-      (index) => {
-        'id': '${category.toLowerCase()}_$index',
-        'title': '$category Quiz ${index + 1}',
-        'description': 'Quiz related to $category',
-        'difficulty':
-            index % 3 == 0
-                ? 'Easy'
-                : index % 3 == 1
-                ? 'Medium'
-                : 'Hard',
-        'questionCount': 8 + index,
-        'tag': category,
-      },
-    );
-  }
-
-  List<Map<String, dynamic>> _getMockQuizzesByDifficulty(String difficulty) {
-    return List.generate(
-      5,
-      (index) => {
-        'id': '${difficulty.toLowerCase()}_$index',
-        'title': '$difficulty Level Quiz ${index + 1}',
-        'description': 'A $difficulty difficulty quiz',
-        'difficulty': difficulty,
-        'questionCount':
-            difficulty == 'Easy'
-                ? 5 + index
-                : difficulty == 'Medium'
-                ? 10 + index
-                : 15 + index,
-        'tag':
-            index % 4 == 0
-                ? 'Science'
-                : index % 4 == 1
-                ? 'Math'
-                : index % 4 == 2
-                ? 'Language'
-                : 'History',
-      },
-    );
-  }
-
-  List<Map<String, dynamic>> _getMockQuizzesBySearch(String query) {
-    // Simple mock implementation that returns quizzes that contain the query in title
-    final allQuizzes = _getMockAllQuizzes();
-    return allQuizzes
-        .where(
-          (quiz) =>
-              quiz['title'].toString().toLowerCase().contains(
-                query.toLowerCase(),
-              ) ||
-              quiz['description'].toString().toLowerCase().contains(
-                query.toLowerCase(),
-              ) ||
-              quiz['tag'].toString().toLowerCase().contains(
-                query.toLowerCase(),
-              ),
-        )
-        .toList();
-  }
-
-  List<Map<String, dynamic>> _getMockRecentQuizzes() {
-    return List.generate(
-      5,
-      (index) => {
-        'id': 'recent_$index',
-        'title': 'Recent Quiz ${index + 1}',
-        'description':
-            'Created on ${DateTime.now().subtract(Duration(days: index)).toString().substring(0, 10)}',
-        'difficulty':
-            index % 3 == 0
-                ? 'Easy'
-                : index % 3 == 1
-                ? 'Medium'
-                : 'Hard',
-        'questionCount': 1,
-        'tag': index % 2 == 0 ? 'Science' : 'Math',
-      },
-    );
-  }
-
-  List<Map<String, dynamic>> _getMockFavoriteQuizzes() {
-    return List.generate(
-      3,
-      (index) => {
-        'id': 'fav_$index',
-        'title': 'Favorite Quiz ${index + 1}',
-        'description':
-            'Last used: ${DateTime.now().subtract(Duration(days: index * 2)).toString().substring(0, 10)}',
-        'difficulty':
-            index % 3 == 0
-                ? 'Easy'
-                : index % 3 == 1
-                ? 'Medium'
-                : 'Hard',
-        'questionCount': 8 + index,
-        'tag': index % 2 == 0 ? 'History' : 'Biology',
-      },
-    );
+        : difficulty == DifficultyLevel.hard
+        ? Colors.red
+        : difficulty == DifficultyLevel.all
+        ? Colors.blueAccent
+        : Colors.grey;
   }
 }

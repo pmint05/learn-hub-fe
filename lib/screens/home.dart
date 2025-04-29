@@ -173,10 +173,10 @@ class _HomeScreenState extends State<HomeScreen>
           shaderCallback:
               (bounds) => LinearGradient(
                 colors: [
-                  cs.surface.withValues(alpha:0),
+                  cs.surface.withValues(alpha: 0),
                   Colors.white,
                   Colors.white,
-                  cs.surface.withValues(alpha:0),
+                  cs.surface.withValues(alpha: 0),
                 ],
                 stops: [0, 0.05, 0.88, 1],
                 begin: Alignment.topCenter,
@@ -194,8 +194,8 @@ class _HomeScreenState extends State<HomeScreen>
                   ),
               children: [
                 _buildHeader(cs, currentUser),
-                _buildWelcomeCard(cs, ),
-                _buildQuickStats(cs, ),
+                _buildWelcomeCard(cs),
+                _buildQuickStats(cs),
                 AlertBox(
                   subtitle: "✨ Upgrade to PRO for more features and benefits.",
                   type: AlertBoxType.warning,
@@ -247,7 +247,7 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  Widget _buildHeader(ColorScheme cs,AppUser? currentUser) {
+  Widget _buildHeader(ColorScheme cs, AppUser? currentUser) {
     final name =
         currentUser?.displayName?.isNotEmpty == true
             ? currentUser!.displayName!
@@ -277,13 +277,16 @@ class _HomeScreenState extends State<HomeScreen>
                 backgroundColor: cs.onPrimary.withValues(alpha: 0.2),
                 radius: 24,
                 backgroundImage:
-                    currentUser?.photoURL != null && currentUser!.photoURL!.isNotEmpty && currentUser.photoURL!.startsWith("http")
+                    currentUser?.photoURL != null &&
+                            currentUser!.photoURL!.isNotEmpty &&
+                            currentUser.photoURL!.startsWith("http")
                         ? NetworkImage(currentUser.photoURL!)
                         : null,
                 child:
-                    currentUser?.photoURL == null || !currentUser!.photoURL!.startsWith("http")
-                        ? Text(name.substring(0, 2)
-                              .toUpperCase(),
+                    currentUser?.photoURL == null ||
+                            !currentUser!.photoURL!.startsWith("http")
+                        ? Text(
+                          name.substring(0, 2).toUpperCase(),
                           style: TextStyle(
                             color: cs.onPrimary,
                             fontWeight: FontWeight.bold,
@@ -295,14 +298,28 @@ class _HomeScreenState extends State<HomeScreen>
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Hello, $name!',
-                    style: TextStyle(
-                      color: cs.onPrimary,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      Text(
+                        'Hello,',
+                        style: TextStyle(
+                          color: cs.onPrimary,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        '$name!',
+                        style: TextStyle(
+                          color: cs.onPrimary,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
                   ),
+
                   Text(
                     'Ready to learn something new?',
                     style: TextStyle(
@@ -348,10 +365,7 @@ class _HomeScreenState extends State<HomeScreen>
             ),
             const SizedBox(height: 16),
             OutlinedButton.icon(
-              onPressed:
-                  () => {
-                    context.pushNamed(AppRoute.generateQuiz.name),
-                  },
+              onPressed: () => {context.pushNamed(AppRoute.generateQuiz.name)},
               icon: const Icon(PhosphorIconsRegular.plus),
               label: const Text('Get Started'),
               style: OutlinedButton.styleFrom(
@@ -813,7 +827,7 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  void _showCreateQuizBottomSheet(ColorScheme cs,BuildContext context) {
+  void _showCreateQuizBottomSheet(ColorScheme cs, BuildContext context) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,

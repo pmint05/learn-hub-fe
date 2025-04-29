@@ -29,14 +29,30 @@ class _LoginScreenState extends State<LoginScreen> {
   String? _emailError;
   String? _passwordError;
 
-  // Điều hướng đến WelcomeScreen khi nhấn "Forget Password?"
   void _onForgotPassword() {
-    context.goNamed(AppRoute.welcome.name);
+    context.goNamed(AppRoute.forgotPassword.name);
   }
 
-  // Điều hướng đến RegisterScreen khi nhấn "CREATE NEW ACCOUNT"
   void _onCreateNewAccount() {
     context.go("/register");
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final authProvider = Provider.of<AppAuthProvider>(context);
+    if (authProvider.isAuthed) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        context.go("/");
+      });
+    }
   }
 
   @override
@@ -261,19 +277,39 @@ class _LoginScreenState extends State<LoginScreen> {
                                       // Handle specific auth errors
                                       String message =
                                           e.toString().toLowerCase();
-                                      if (message.contains('user-not-found')) {
-                                        setState(
-                                          () =>
-                                              _emailError =
-                                                  'No account found with this email',
-                                        );
-                                      } else if (message.contains(
-                                        'wrong-password',
-                                      )) {
-                                        setState(
-                                          () =>
-                                              _passwordError =
-                                                  'Incorrect password',
+                                      final RegExp regex = RegExp(r'\[(.*?)\]');
+                                      final String code =
+                                          regex
+                                              .firstMatch(message)
+                                              ?.group(1)
+                                              ?.replaceAll('firebase_', '') ??
+                                          '';
+                                      print(code);
+                                      if (code.isNotEmpty &&
+                                          commonFirebaseErrors[code] != null) {
+                                        showDialog(
+                                          context: context,
+                                          builder: (context) {
+                                            return AlertDialog(
+                                              title: const Text(
+                                                "Error",
+                                                textAlign: TextAlign.center,
+                                              ),
+                                              content: Text(
+                                                commonFirebaseErrors[code]!,
+                                                textAlign: TextAlign.center,
+                                              ),
+                                              actionsAlignment: MainAxisAlignment.center,
+                                              actions: [
+                                                TextButton(
+                                                  onPressed: () {
+                                                    Navigator.of(context).pop();
+                                                  },
+                                                  child: const Text("OK"),
+                                                ),
+                                              ],
+                                            );
+                                          },
                                         );
                                       } else {
                                         ScaffoldMessenger.of(

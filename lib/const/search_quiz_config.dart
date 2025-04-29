@@ -5,15 +5,16 @@ class SearchQuizConfig {
   final String? currentUserId = FirebaseAuth.instance.currentUser?.uid;
 
   final String? searchText;
-  final bool isPublic;
+  final bool? isPublic;
   final List<String>? categories;
   final DifficultyLevel? difficulty;
   final String? minCreatedDate;
   final String? maxCreatedDate;
   final String? minLastModifiedDate;
   final String? maxLastModifiedDate;
-  final int size;
-  final int start;
+  final int? size;
+  final int? start;
+  final bool includeUserId;
 
   SearchQuizConfig({
     this.minCreatedDate,
@@ -23,25 +24,27 @@ class SearchQuizConfig {
     this.categories,
     this.difficulty,
     required this.searchText,
-    required this.isPublic,
-    required this.size,
-    required this.start,
+    this.isPublic,
+    required this.includeUserId,
+    this.size,
+    this.start,
   });
 
   Map<String, dynamic> toJson() {
     return {
-      'user_id': currentUserId,
+      if (includeUserId) 'user_id': currentUserId,
       'search_text': searchText,
-      'is_public': isPublic,
-      'categories': categories,
-      'difficulty': difficulty?.name,
-      'min_created_date': minCreatedDate,
-      'max_created_date': maxCreatedDate,
-      'min_last_modified_date': minLastModifiedDate,
-      'max_last_modified_date': maxLastModifiedDate,
-      'size': size,
-      'start': start,
+      if (isPublic != null) 'is_public': isPublic,
+      if (categories != null) 'categories': categories,
+      if (difficulty != null) 'difficulty': difficulty?.name,
+      if (minCreatedDate != null) 'min_created_date': minCreatedDate,
+      if (maxCreatedDate != null) 'max_created_date': maxCreatedDate,
+      if (minLastModifiedDate != null)
+        'min_last_modified_date': minLastModifiedDate,
+      if (maxLastModifiedDate != null)
+        'max_last_modified_date': maxLastModifiedDate,
+      if (size != null) 'size': size,
+      if (start != null) 'start': start,
     };
   }
-
 }

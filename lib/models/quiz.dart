@@ -28,4 +28,21 @@ class Quiz {
     this.lastModifiedDate,
     this.difficulty,
   });
+
+  Quiz.fromJson(Map<String, dynamic> json)
+      : quizId = json['_id'] ?? '',
+        createdBy = json['user_id'] ?? '',
+        numberOfQuestions = json['num_question'] ?? 0,
+        isPublic = json['is_public'] ?? false,
+        questions = List<Map<String, dynamic>>.from(json['questions'] ?? []) {
+    title = json['title'] ?? '';
+    description = json['description'] ?? '';
+    categories = List<String>.from(json['categories'] ?? []);
+    createdDate = DateTime.tryParse(json['created_date'] ?? '');
+    lastModifiedDate = DateTime.tryParse(json['last_modified_date'] ?? '');
+    difficulty = DifficultyLevel.values.firstWhere(
+      (e) => e.name == (json['difficulty'] ?? ''),
+      orElse: () => DifficultyLevel.unknown,
+    );
+  }
 }

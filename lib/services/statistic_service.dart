@@ -1,13 +1,14 @@
-
 import 'package:dio/dio.dart';
+import 'package:learn_hub/const/search_quiz_config.dart';
 import 'package:learn_hub/utils/api_helper.dart';
 
 class StatisticService {
-
-  Future<Map<String, dynamic>> countQuizs() async {
+  Future<Map<String, dynamic>> countQuiz(SearchQuizConfig config) async {
     try {
-      final response = await dio.get(
+      print('Counting quizzes with config: ${config.toJson()}');
+      final response = await dio.post(
         '$baseUrl/quiz/count',
+        data: config.toJson(),
         options: Options(headers: await getAuthHeaders('application/json')),
       );
       return response.data;

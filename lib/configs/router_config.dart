@@ -8,6 +8,7 @@ import 'package:learn_hub/providers/app_auth_provider.dart';
 import 'package:learn_hub/screens/app.dart';
 import 'package:learn_hub/screens/do_quizzes.dart';
 import 'package:learn_hub/screens/do_quizzes_result.dart';
+import 'package:learn_hub/screens/forgot_password.dart';
 import 'package:learn_hub/screens/generate_quizzes.dart';
 import 'package:learn_hub/screens/home.dart';
 import 'package:learn_hub/screens/login.dart';
@@ -30,6 +31,7 @@ enum AppRoute {
   welcome,
   login,
   register,
+  forgotPassword,
   doQuizzes,
   quizResults,
   generateQuiz,
@@ -51,10 +53,12 @@ GoRouter createRouter(AppAuthProvider authProvider) {
       final isAuthRoute =
           state.matchedLocation == '/login' ||
           state.matchedLocation == '/register' ||
-          state.matchedLocation == '/welcome';
+          state.matchedLocation == '/welcome' ||
+          state.matchedLocation == '/forgot-password';
 
       if (state.matchedLocation == '/login' ||
-          state.matchedLocation == '/register') {
+          state.matchedLocation == '/register' ||
+          state.matchedLocation == '/forgot-password') {
         return null;
       }
 
@@ -85,6 +89,13 @@ GoRouter createRouter(AppAuthProvider authProvider) {
         parentNavigatorKey: rootNavigatorKey,
         builder: (context, state) => const RegisterScreen(),
       ),
+      GoRoute(
+        path: "/forgot-password",
+        name: AppRoute.forgotPassword.name,
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => const ForgotPasswordScreen(),
+      ),
+
 
       GoRoute(
         path: '/do-quizzes',

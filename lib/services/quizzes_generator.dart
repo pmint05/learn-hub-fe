@@ -64,6 +64,8 @@ class QuizzesGenerator {
     String? url,
     Function(double, String)? onProgress,
   }) async {
+    print('Creating quizzes task with config: ${config.toJson()} by user: $currentUserId');
+    
     await _loadCurrentTask();
 
     if (_currentTask != null &&
@@ -140,7 +142,7 @@ class QuizzesGenerator {
       'lang': config.language.name.toLowerCase(),
       if (currentUserId != null && currentUserId!.isNotEmpty)
         'user_id': currentUserId!,
-      'is_public': true,
+      'is_public': config.isPublic,
     };
 
     try {
@@ -209,7 +211,7 @@ class QuizzesGenerator {
       'lang': config.language.name.toLowerCase(),
       if (currentUserId != null && currentUserId!.isNotEmpty)
         'user_id': currentUserId!,
-      'is_public': true,
+      'is_public': config.isPublic,
     };
 
     try {
@@ -267,7 +269,7 @@ class QuizzesGenerator {
       'lang': config.language.name.toLowerCase(),
       if (currentUserId != null && currentUserId!.isNotEmpty)
         'user_id': currentUserId!,
-      'is_public': true,
+      'is_public': config.isPublic,
     };
 
     try {
@@ -316,9 +318,9 @@ class QuizzesGenerator {
 
       if (response.statusCode == 200) {
         final List<dynamic> data =
-            response.data['result']['quizzes'] ??
             response.data['result']['questions'] ??
             response.data['result']['data'] ??
+            response.data['result']['quizzes'] ??
             [];
 
         final result = List<Map<String, dynamic>>.from(data);
@@ -378,11 +380,11 @@ class QuizzesGenerator {
 
     // Poll for status until complete
     String status = task.status;
-    while (status != 'completed' && status != 'failed') {
-      await Future.delayed(const Duration(seconds: 2));
-      status = (await checkTaskStatus(task.taskId))['status'] ?? 'pending';
-      onProgress?.call(0.95, "Waiting for processing completion... $status");
-    }
+    // while (status != 'completed' && status != 'failed') {
+    //   await Future.delayed(const Duration(seconds: 2));
+    //   status = (await checkTaskStatus(task.taskId))['status'] ?? 'pending';
+    //   onProgress?.call(0.95, "Waiting for processing completion... $status");
+    // }
 
     if (status == 'failed') {
       throw Exception('Task processing failed');

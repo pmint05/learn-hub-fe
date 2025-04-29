@@ -10,6 +10,7 @@ import 'package:learn_hub/const/material_service_config.dart';
 import 'package:learn_hub/screens/ask.dart';
 import 'package:learn_hub/services/material_manager.dart';
 import 'package:learn_hub/utils/api_helper.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
@@ -66,6 +67,7 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
 
   bool _isProcessingTask = false;
   TaskState _currentTaskState = TaskState.searching;
+  double _downloadProgress = 0.0;
 
   bool _isMultiSelectMode = false;
   final Set<String> _selectedDocuments = {};
@@ -104,10 +106,12 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
   }
 
   void _onSearchChanged() {
+    if (!mounted || _searchController.text.trim() == '') return;
+
     if (_debounce?.isActive ?? false) _debounce!.cancel();
     _debounce = Timer(const Duration(milliseconds: 300), () {
       setState(() {
-        _searchQuery = _searchController.text;
+        _searchQuery = _searchController.text.trim();
         _currentPage = 0;
         _hasMoreData = true;
         _applyFilters();
@@ -255,7 +259,6 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
           _hasMoreData = response['total'] == _pageSize;
         });
 
-
         print('Loaded ${newDocuments.length} more documents');
       }
     } else {
@@ -327,46 +330,6 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
         _isLoading = false;
       });
     }
-
-    // var filtered =
-    //     _documents
-    //         .where(
-    //           (doc) =>
-    //               doc.name.toLowerCase().contains(_searchQuery.toLowerCase()),
-    //         )
-    //         .toList();
-    //
-    // // Filter by file type
-    // if (_currentFileExtension != FileExtension.all) {
-    //   filtered =
-    //       filtered
-    //           .where(
-    //             (doc) =>
-    //                 doc.extension.toLowerCase() ==
-    //                 _currentFileExtension.name.toLowerCase(),
-    //           )
-    //           .toList();
-    // }
-    //
-    // // Sort documents
-    // switch (_currentSortOption) {
-    //   case SortOption.nameAsc:
-    //     filtered.sort((a, b) => a.name.compareTo(b.name));
-    //   case SortOption.nameDesc:
-    //     filtered.sort((a, b) => b.name.compareTo(a.name));
-    //   case SortOption.dateAsc:
-    //     filtered.sort((a, b) => a.dateAdded.compareTo(b.dateAdded));
-    //   case SortOption.dateDesc:
-    //     filtered.sort((a, b) => b.dateAdded.compareTo(a.dateAdded));
-    //   case SortOption.sizeAsc:
-    //     filtered.sort((a, b) => a.size.compareTo(b.size));
-    //   case SortOption.sizeDesc:
-    //     filtered.sort((a, b) => b.size.compareTo(a.size));
-    // }
-    //
-    // setState(() {
-    //   _filteredDocuments = filtered;
-    // });
   }
 
   Future<void> _pickAndUploadFile() async {
@@ -768,16 +731,60 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
     final status = await Permission.storage.request();
 
     if (status.isGranted) {
-      // Simulate download
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Downloading ${doc.name}...')));
+      final String? selectedDirectory =
+          await FilePicker.platform.getDirectoryPath();
 
-      await Future.delayed(const Duration(seconds: 2));
+      if (selectedDirectory == null) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('No directory selected')));
+        return;
+      }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${doc.name} downloaded successfully')),
-      );
+      final filePath =
+          '$selectedDirectory/${doc.name.contains('.') ? doc.name : '${doc.name}.${doc.extension}'}';
+      print('File path: $filePath');
+
+      try {
+        setState(() {
+          _isProcessingTask = true;
+          _currentTaskState = TaskState.downloading;
+          _downloadProgress = 0.0;
+        });
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Downloading ${doc.name}...')));
+
+        await dio.download(
+          doc.url,
+          filePath,
+          onReceiveProgress: (received, total) {
+            if (total != -1) {
+              setState(() {
+                _downloadProgress = received / total;
+              });
+              print(
+                'Progress: ${(received / total * 100).toStringAsFixed(0)}%',
+              );
+            }
+          },
+        );
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${doc.name} downloaded successfully')),
+        );
+      } catch (e) {
+        print('Error downloading file: $e');
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error downloading file: $e')));
+      } finally {
+        setState(() {
+          _isProcessingTask = false;
+          _currentTaskState = TaskState.searching;
+          _downloadProgress = 0.0;
+        });
+      }
     } else {
       ScaffoldMessenger.of(
         context,
@@ -910,7 +917,8 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
       margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
       color:
           isSelected ? cs.primaryContainer.withValues(alpha: 0.7) : cs.surface,
-      elevation: 1,
+      elevation: 3,
+      shadowColor: cs.shadow.withValues(alpha: 0.15),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () {
@@ -1130,7 +1138,10 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
                     ),
                   ),
                   LinearProgressIndicator(
-                    value: null,
+                    value:
+                        _currentTaskState == TaskState.downloading
+                            ? _downloadProgress
+                            : null,
                     backgroundColor: cs.surface.withValues(alpha: 0.5),
                   ),
                 ],

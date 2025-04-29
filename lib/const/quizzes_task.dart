@@ -50,6 +50,7 @@ class QuizzesTask {
       taskId: json['taskId'],
       createdAt: DateTime.parse(json['createdAt']),
       config: QuizzesGeneratorConfig(
+        isPublic: json['config']['is_public'] ?? false,
         source: QuizzesSource.values.byName(json['config']['source']),
         type: QuizzesType.values.byName(json['config']['type']),
         mode: QuizzesMode.values.byName(json['config']['mode']),

@@ -237,6 +237,17 @@ class AppAuthProvider extends ChangeNotifier {
     }
   }
 
+  Future<bool> sendPasswordResetEmail(String email) async {
+    try {
+      await _auth.sendPasswordResetEmail(email: email);
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
   Future<String?> getIdToken({bool forceRefresh = false}) async {
     try {
       if (_user != null) {

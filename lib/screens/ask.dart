@@ -245,7 +245,8 @@ class _AskScreenState extends State<AskScreen> {
               checkTaskStatus(taskId).then((response) {
                 if (response['status'] == 'completed') {
                   _queryMessage(message);
-                } else {
+                  timer.cancel();
+                } else if (response['status'] == 'error'){
                   setState(() {
                     _isGettingResponse = false;
                     _messages.removeAt(_messages.length - 1);
@@ -261,8 +262,8 @@ class _AskScreenState extends State<AskScreen> {
                   WidgetsBinding.instance.addPostFrameCallback((_) {
                     _scrollToBottom();
                   });
+                  timer.cancel();
                 }
-                timer.cancel();
               });
             });
           });
