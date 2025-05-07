@@ -32,6 +32,7 @@ class SearchQuizzesScreen extends StatefulWidget {
 
 class _SearchQuizzesScreenState extends State<SearchQuizzesScreen> {
   late ColorScheme cs = Theme.of(context).colorScheme;
+  late final maxBottomSheetHeight = MediaQuery.of(context).size.height * 0.85;
 
   final _pageSize = 10;
   int? _currentPage = 0;
@@ -41,6 +42,8 @@ class _SearchQuizzesScreenState extends State<SearchQuizzesScreen> {
   String? _error;
   DifficultyLevel? _selectedDifficulty;
   List<String> _selectedCategories = [];
+  String? _selectedSortBy;
+  int? _sortOrder;
   late SearchQuizConfig _currentSearchConfig;
 
   List<Map<String, dynamic>> _quizzes = [];
@@ -54,6 +57,8 @@ class _SearchQuizzesScreenState extends State<SearchQuizzesScreen> {
     _currentSearchConfig = widget.searchExtra.searchConfig;
     _selectedDifficulty = _currentSearchConfig.difficulty;
     _selectedCategories = _currentSearchConfig.categories ?? [];
+    _selectedSortBy = _currentSearchConfig.sortBy;
+    _sortOrder = _currentSearchConfig.sortOrder;
     if (widget.searchExtra.showSearchBar ?? false) {
       _searchController.text = _currentSearchConfig.searchText ?? "";
     }
@@ -105,6 +110,8 @@ class _SearchQuizzesScreenState extends State<SearchQuizzesScreen> {
         isPublic: _currentSearchConfig.isPublic,
         categories: _selectedCategories.isNotEmpty ? _selectedCategories : null,
         difficulty: _selectedDifficulty,
+        sortBy: _selectedSortBy,
+        sortOrder: _sortOrder,
         size: _pageSize,
         start: _currentPage! * _pageSize,
       );
@@ -124,6 +131,7 @@ class _SearchQuizzesScreenState extends State<SearchQuizzesScreen> {
           _isLoading = false;
           _isLoadingMore = false;
           _canLoadMore = response['total'] == _pageSize;
+          // print("can load more: $_canLoadMore");
         });
       } else {
         print("Error fetching quizzes: ${response['message']}");
@@ -146,6 +154,7 @@ class _SearchQuizzesScreenState extends State<SearchQuizzesScreen> {
   }
 
   void _loadMoreQuiz() async {
+    print("Loading more quiz...");
     if (_canLoadMore!) {
       setState(() {
         _isLoadingMore = true;
@@ -252,24 +261,38 @@ class _SearchQuizzesScreenState extends State<SearchQuizzesScreen> {
         if (widget.searchExtra.showSearchBar ?? false) _buildSearchBar(),
         Expanded(
           child: RefreshIndicator(
-            onRefresh: _searchQuiz,
+            onRefresh: () async {
+              _searchQuiz(reset: true);
+            },
             child: AnimationLimiter(
               child: ListView.builder(
+                controller: _scrollController,
                 padding: const EdgeInsets.all(16),
-                itemCount: _quizzes.length,
+                itemCount: _quizzes.length + 1,
                 physics: const AlwaysScrollableScrollPhysics(
                   parent: BouncingScrollPhysics(),
                 ),
                 itemBuilder: (context, index) {
                   if (index == _quizzes.length) {
-                    return Center(
+                    return _isLoadingMore
+                        ? Center(
                       child: Padding(
-                        padding: const EdgeInsets.all(8.0),
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 16.0,
+                        ),
                         child: CircularProgressIndicator(),
                       ),
+                    )
+                        : SizedBox(
+                      height:
+                      _quizzes.isEmpty
+                          ? MediaQuery.of(context).size.height *
+                          0.6
+                          : 40,
                     );
                   }
                   final quiz = _quizzes[index];
+
                   return AnimationConfiguration.staggeredList(
                     position: index,
                     duration: const Duration(milliseconds: 400),
@@ -292,6 +315,8 @@ class _SearchQuizzesScreenState extends State<SearchQuizzesScreen> {
   void _showFilterBottomSheet() {
     List<String> tempCategories = List.from(_selectedCategories);
     DifficultyLevel? tempDifficulty = _selectedDifficulty;
+    String? tempSortBy = _selectedSortBy;
+    int? tempSortOrder = _sortOrder;
 
     showModalBottomSheet(
       context: context,
@@ -308,6 +333,7 @@ class _SearchQuizzesScreenState extends State<SearchQuizzesScreen> {
                     top: Radius.circular(20),
                   ),
                 ),
+                constraints: BoxConstraints(maxHeight: maxBottomSheetHeight),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -322,49 +348,42 @@ class _SearchQuizzesScreenState extends State<SearchQuizzesScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 20),
-                    Text(
-                      "Filter Quizzes",
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: cs.onSurface,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      "Difficulty",
-                      style: TextStyle(
-                        fontWeight: FontWeight.w500,
-                        color: cs.onSurface,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      children:
-                          DifficultyLevel.values
-                              .where(
-                                (d) =>
-                                    d != DifficultyLevel.unknown &&
-                                    d != DifficultyLevel.all,
-                              )
-                              .map(
-                                (difficulty) => FilterChip(
-                                  label: Text(
-                                    StringHelpers.capitalize(difficulty.name),
-                                  ),
-                                  selected: tempDifficulty == difficulty,
+                    const SizedBox(height: 10),
+                    Flexible(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SizedBox(height: 10),
+                            Text(
+                              "Sort Quizzes",
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: cs.onSurface,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            Wrap(
+                              spacing: 8,
+                              children: [
+                                ChoiceChip(
+                                  label: Text("Newest"),
+                                  selected:
+                                      tempSortBy == "created_date" &&
+                                      tempSortOrder == -1,
                                   onSelected: (selected) {
                                     setModalState(() {
-                                      tempDifficulty =
-                                          selected ? difficulty : null;
+                                      tempSortBy = "created_date";
+                                      tempSortOrder = -1;
                                     });
                                   },
                                   backgroundColor: cs.surface,
                                   labelStyle: TextStyle(
                                     color:
-                                        tempDifficulty == difficulty
+                                        tempSortBy == 'created_date' &&
+                                                tempSortOrder == -1
                                             ? cs.primary
                                             : cs.onSurfaceVariant,
                                   ),
@@ -376,113 +395,315 @@ class _SearchQuizzesScreenState extends State<SearchQuizzesScreen> {
                                     borderRadius: BorderRadius.circular(16),
                                     side: BorderSide(
                                       color:
-                                          tempDifficulty == difficulty
+                                          tempSortBy == 'created_date' &&
+                                                  tempSortOrder == -1
                                               ? cs.primary
                                               : cs.surfaceDim,
                                     ),
                                   ),
                                 ),
-                              )
-                              .toList(),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      "Categories",
-                      style: TextStyle(
-                        fontWeight: FontWeight.w500,
-                        color: cs.onSurface,
+                                ChoiceChip(
+                                  label: Text("Oldest"),
+                                  selected:
+                                      tempSortBy == "created_date" &&
+                                      tempSortOrder == 1,
+                                  onSelected: (selected) {
+                                    setModalState(() {
+                                      tempSortBy = "created_date";
+                                      tempSortOrder = 1;
+                                    });
+                                  },
+                                  backgroundColor: cs.surface,
+                                  labelStyle: TextStyle(
+                                    color:
+                                        tempSortBy == 'created_date' &&
+                                                tempSortOrder == 1
+                                            ? cs.primary
+                                            : cs.onSurfaceVariant,
+                                  ),
+                                  selectedColor: cs.primary.withValues(
+                                    alpha: 0.2,
+                                  ),
+                                  checkmarkColor: cs.primary,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                    side: BorderSide(
+                                      color:
+                                          tempSortBy == 'created_date' &&
+                                                  tempSortOrder == -1
+                                              ? cs.primary
+                                              : cs.surfaceDim,
+                                    ),
+                                  ),
+                                ),
+                                ChoiceChip(
+                                  label: Text("Number of Questions (Asc)"),
+                                  selected:
+                                      tempSortBy == "num_question" &&
+                                      tempSortOrder == 1,
+                                  onSelected: (selected) {
+                                    setModalState(() {
+                                      tempSortBy = "num_question";
+                                      tempSortOrder = 1;
+                                    });
+                                  },
+                                  backgroundColor: cs.surface,
+                                  labelStyle: TextStyle(
+                                    color:
+                                        tempSortBy == "num_question" &&
+                                                tempSortOrder == 1
+                                            ? cs.primary
+                                            : cs.onSurfaceVariant,
+                                  ),
+                                  selectedColor: cs.primary.withValues(
+                                    alpha: 0.2,
+                                  ),
+                                  checkmarkColor: cs.primary,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                    side: BorderSide(
+                                      color:
+                                          tempSortBy == "num_question" &&
+                                                  tempSortOrder == 1
+                                              ? cs.primary
+                                              : cs.surfaceDim,
+                                    ),
+                                  ),
+                                ),
+                                ChoiceChip(
+                                  label: Text("Number of Questions (Desc)"),
+                                  selected:
+                                      tempSortBy == "num_question" &&
+                                      tempSortOrder == -1,
+                                  onSelected: (selected) {
+                                    setModalState(() {
+                                      tempSortBy = "num_question";
+                                      tempSortOrder = -1;
+                                    });
+                                  },
+                                  backgroundColor: cs.surface,
+                                  labelStyle: TextStyle(
+                                    color:
+                                        tempSortBy == "num_question" &&
+                                                tempSortOrder == -1
+                                            ? cs.primary
+                                            : cs.onSurfaceVariant,
+                                  ),
+                                  selectedColor: cs.primary.withValues(
+                                    alpha: 0.2,
+                                  ),
+                                  checkmarkColor: cs.primary,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                    side: BorderSide(
+                                      color:
+                                          tempSortBy == "num_question" &&
+                                                  tempSortOrder == -1
+                                              ? cs.primary
+                                              : cs.surfaceDim,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 24),
+                            Text(
+                              "Filter Quizzes",
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: cs.onSurface,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              "Difficulty",
+                              style: TextStyle(
+                                fontWeight: FontWeight.w500,
+                                color: cs.onSurface,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 8,
+                              children:
+                                  DifficultyLevel.values
+                                      .where(
+                                        (d) =>
+                                            d != DifficultyLevel.unknown &&
+                                            d != DifficultyLevel.all,
+                                      )
+                                      .map(
+                                        (difficulty) => FilterChip(
+                                          label: Text(
+                                            StringHelpers.capitalize(
+                                              difficulty.name,
+                                            ),
+                                          ),
+                                          selected:
+                                              tempDifficulty == difficulty,
+                                          onSelected: (selected) {
+                                            setModalState(() {
+                                              tempDifficulty =
+                                                  selected ? difficulty : null;
+                                            });
+                                          },
+                                          backgroundColor: cs.surface,
+                                          labelStyle: TextStyle(
+                                            color:
+                                                tempDifficulty == difficulty
+                                                    ? cs.primary
+                                                    : cs.onSurfaceVariant,
+                                          ),
+                                          selectedColor: cs.primary.withValues(
+                                            alpha: 0.2,
+                                          ),
+                                          checkmarkColor: cs.primary,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              16,
+                                            ),
+                                            side: BorderSide(
+                                              color:
+                                                  tempDifficulty == difficulty
+                                                      ? cs.primary
+                                                      : cs.surfaceDim,
+                                            ),
+                                          ),
+                                        ),
+                                      )
+                                      .toList(),
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              "Categories",
+                              style: TextStyle(
+                                fontWeight: FontWeight.w500,
+                                color: cs.onSurface,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 8,
+                              children:
+                                  availableCategories.map((category) {
+                                    final isSelected = tempCategories.contains(
+                                      category['name'] as String,
+                                    );
+                                    return FilterChip(
+                                      label: Text(category['name'] as String),
+                                      selected: isSelected,
+                                      onSelected: (selected) {
+                                        setModalState(() {
+                                          if (selected) {
+                                            tempCategories.add(
+                                              category['name'] as String,
+                                            );
+                                          } else {
+                                            tempCategories.remove(
+                                              category['name'] as String,
+                                            );
+                                          }
+                                        });
+                                      },
+                                      backgroundColor: cs.surface,
+                                      labelStyle: TextStyle(
+                                        color:
+                                            isSelected
+                                                ? cs.primary
+                                                : cs.onSurfaceVariant,
+                                      ),
+                                      selectedColor: cs.primary.withValues(
+                                        alpha: 0.2,
+                                      ),
+                                      checkmarkColor: cs.primary,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(16),
+                                        side: BorderSide(
+                                          color:
+                                              isSelected
+                                                  ? cs.primary
+                                                  : cs.surfaceDim,
+                                        ),
+                                      ),
+                                    );
+                                  }).toList(),
+                            ),
+                            const SizedBox(height: 30),
+                          ],
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      children:
-                          availableCategories.map((category) {
-                            final isSelected = tempCategories.contains(
-                              category['name'] as String,
-                            );
-                            return FilterChip(
-                              label: Text(category['name'] as String),
-                              selected: isSelected,
-                              onSelected: (selected) {
+
+                    Container(
+                      padding: const EdgeInsets.fromLTRB(10, 10, 10, 0),
+                      decoration: BoxDecoration(
+                        color: cs.surface,
+                        border: Border(
+                          top: BorderSide(
+                            color: cs.surfaceDim.withValues(alpha: 0.5),
+                          ),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () {
                                 setModalState(() {
-                                  if (selected) {
-                                    tempCategories.add(category['name'] as String);
-                                  } else {
-                                    tempCategories.remove(category['name'] as String,);
-                                  }
+                                  tempCategories.clear();
+                                  tempDifficulty = null;
+                                  tempSortOrder = null;
+                                  tempSortBy = null;
                                 });
                               },
-                              backgroundColor: cs.surface,
-                              labelStyle: TextStyle(
-                                color:
-                                    isSelected
-                                        ? cs.primary
-                                        : cs.onSurfaceVariant,
-                              ),
-                              selectedColor: cs.primary.withValues(alpha: 0.2),
-                              checkmarkColor: cs.primary,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                                side: BorderSide(
-                                  color:
-                                      isSelected ? cs.primary : cs.surfaceDim,
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
+                                side: BorderSide(color: cs.primary),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
                                 ),
                               ),
-                            );
-                          }).toList(),
-                    ),
-                    const SizedBox(height: 24),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () {
-                              setModalState(() {
-                                tempCategories.clear();
-                                tempDifficulty = null;
-                              });
-                            },
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              side: BorderSide(color: cs.primary),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
+                              child: Text(
+                                "Reset",
+                                style: TextStyle(color: cs.primary),
                               ),
                             ),
-                            child: Text(
-                              "Reset",
-                              style: TextStyle(color: cs.primary),
-                            ),
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: FilledButton(
-                            onPressed: () {
-                              Navigator.pop(context);
-                              setState(() {
-                                _selectedCategories = tempCategories;
-                                _selectedDifficulty = tempDifficulty;
-                              });
-                              _searchQuiz(reset: true);
-                            },
-                            style: FilledButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              backgroundColor: cs.primary,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: FilledButton(
+                              onPressed: () {
+                                Navigator.pop(context);
+                                setState(() {
+                                  _selectedCategories = tempCategories;
+                                  _selectedDifficulty = tempDifficulty;
+                                  _selectedSortBy = tempSortBy;
+                                  _sortOrder = tempSortOrder;
+                                });
+                                _searchQuiz(reset: true);
+                              },
+                              style: FilledButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
+                                backgroundColor: cs.primary,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: Text(
+                                "Apply",
+                                style: TextStyle(color: cs.onPrimary),
                               ),
                             ),
-                            child: Text(
-                              "Apply",
-                              style: TextStyle(color: cs.onPrimary),
-                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                    SizedBox(height: MediaQuery.of(context).padding.bottom),
+                    // SizedBox(height: MediaQuery.of(context).padding.bottom),
                   ],
                 ),
               );
@@ -599,13 +820,16 @@ class _SearchQuizzesScreenState extends State<SearchQuizzesScreen> {
                 ],
               ),
               const SizedBox(height: 8),
-              if (quiz.containsKey('categories') && quiz['categories'].isNotEmpty)
-                Text(quiz['categories'].join(', '),
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: cs.primary,
-                      fontStyle: FontStyle.italic
-                    )),
+              if (quiz.containsKey('categories') &&
+                  quiz['categories'].isNotEmpty)
+                Text(
+                  quiz['categories'].join(', '),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: cs.primary,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
               const SizedBox(height: 12),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,

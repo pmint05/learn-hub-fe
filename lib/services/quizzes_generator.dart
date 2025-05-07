@@ -62,6 +62,7 @@ class QuizzesGenerator {
     PlatformFile? fileInfo,
     String? text,
     String? url,
+    String? materialId,
     Function(double, String)? onProgress,
   }) async {
     print('Creating quizzes task with config: ${config.toJson()} by user: $currentUserId');
@@ -97,6 +98,12 @@ class QuizzesGenerator {
       case QuizzesSource.link:
         return await _createQuizzesTaskFromLink(
           url,
+          config,
+          onProgress,
+        );
+      case QuizzesSource.material:
+        return await _createQuizzesTaskFromMaterial(
+          materialId,
           config,
           onProgress,
         );
@@ -305,6 +312,76 @@ class QuizzesGenerator {
       }
     } catch (e) {
       throw Exception('Error creating task from link: $e');
+    }
+  }
+
+  Future<QuizzesTask> _createQuizzesTaskFromMaterial(
+    String? materialId,
+    QuizzesGeneratorConfig config,
+    Function(double, String)? onProgress,
+  ) async {
+    if (materialId == null || materialId.isEmpty) {
+      throw Exception('No material ID provided');
+    }
+
+    print('Creating quizzes task from material with ID: $materialId and config: ${config.toJson()}');
+
+    final headers = await getAuthHeaders('application/json');
+
+    final params = {
+      'type': config.type.name.toLowerCase(),
+      'mode': config.mode.name.toLowerCase(),
+      'difficulty': config.difficulty.name.toLowerCase(),
+      'count': config.numberOfQuiz.toString(),
+      'lang': config.language.name.toLowerCase(),
+      if (currentUserId != null && currentUserId!.isNotEmpty)
+        'user_id': currentUserId!,
+      'is_public': config.isPublic,
+    };
+
+    try {
+      onProgress?.call(0.1, "Processing material");
+
+      final response = await dio.post(
+        '$baseUrl/generate/document',
+        data: {},
+        queryParameters: {
+          'document_id': materialId,
+          ...params
+        },
+        options: Options(headers: headers),
+      );
+
+      onProgress?.call(0.9, "Processing response");
+
+      if (response.statusCode == 200) {
+        final taskId = response.data['task_id'];
+        final status = response.data['status'] ?? 'pending';
+
+        _currentTask = QuizzesTask(
+          taskId: taskId,
+          createdAt: DateTime.now(),
+          config: config,
+          status: status,
+        );
+
+        await _saveCurrentTask();
+        return _currentTask!;
+      } else {
+        throw Exception('Failed to create task: ${response.statusCode}');
+      }
+    } catch (e) {
+      if (e is DioException) {
+        print('API Error: ${e.response?.statusCode} - ${e.response?.data}');
+        if (e.response?.statusCode == 401) {
+          throw Exception('Unauthorized');
+        } else if (e.response?.statusCode == 422) {
+          throw Exception('Invalid request parameters: ${e.response?.data}');
+        } else {
+          throw Exception('Failed to generate quizzes: ${e.message}');
+        }
+      }
+      throw Exception('Error creating task from material: $e');
     }
   }
 

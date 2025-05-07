@@ -36,6 +36,8 @@ class SearchMaterialConfig {
   final String? maxCreatedDate;
   final int size;
   final int start;
+  final String? sortBy;
+  final int? sortOrder;
 
   SearchMaterialConfig({
     this.minCreatedDate,
@@ -45,6 +47,8 @@ class SearchMaterialConfig {
     required this.isPublic,
     required this.size,
     required this.start,
+    this.sortBy,
+    this.sortOrder
   });
 
   Map<String, dynamic> toJson() {
@@ -55,6 +59,10 @@ class SearchMaterialConfig {
       if (fileExtension != null) 'file_extension': fileExtension?.name,
       if (minCreatedDate != null) 'min_date': minCreatedDate,
       if (maxCreatedDate != null) 'max_date': maxCreatedDate,
+      if (sortBy != null && sortOrder != null) ...{
+        'sort_by': sortBy,
+        'sort_order': sortOrder
+      },
       'size': size,
       'start': start,
     };

@@ -15,6 +15,8 @@ class SearchQuizConfig {
   final int? size;
   final int? start;
   final bool includeUserId;
+  final String? sortBy;
+  final int? sortOrder;
 
   SearchQuizConfig({
     this.minCreatedDate,
@@ -28,12 +30,14 @@ class SearchQuizConfig {
     required this.includeUserId,
     this.size,
     this.start,
+    this.sortBy,
+    this.sortOrder,
   });
 
   Map<String, dynamic> toJson() {
     return {
       if (includeUserId) 'user_id': currentUserId,
-      'search_text': searchText,
+      'title': searchText,
       if (isPublic != null) 'is_public': isPublic,
       if (categories != null) 'categories': categories,
       if (difficulty != null) 'difficulty': difficulty?.name,
@@ -45,6 +49,10 @@ class SearchQuizConfig {
         'max_last_modified_date': maxLastModifiedDate,
       if (size != null) 'size': size,
       if (start != null) 'start': start,
+      if (sortBy != null && sortOrder != null) ...{
+        'sort_by': sortBy,
+        'sort_order': sortOrder,
+      },
     };
   }
 }

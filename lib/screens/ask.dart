@@ -246,7 +246,7 @@ class _AskScreenState extends State<AskScreen> {
                 if (response['status'] == 'completed') {
                   _queryMessage(message);
                   timer.cancel();
-                } else if (response['status'] == 'error'){
+                } else if (response['status'] == 'error') {
                   setState(() {
                     _isGettingResponse = false;
                     _messages.removeAt(_messages.length - 1);
@@ -274,6 +274,7 @@ class _AskScreenState extends State<AskScreen> {
             _contextFiles = null;
           });
           _aiService.addContextFileToChat(tmp!).then((res) {
+            print(res);
             if (res['status'] != 'success') {
               setState(() {
                 _isGettingResponse = false;
@@ -292,9 +293,53 @@ class _AskScreenState extends State<AskScreen> {
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 _scrollToBottom();
               });
-              return;
+            } else {
+              String taskId = res['task_id'];
+
+              Timer.periodic(const Duration(seconds: 2), (timer) {
+                checkTaskStatus(taskId)
+                    .then((response) {
+                      if (response['status'] == 'completed') {
+                        _queryMessage(message);
+                        timer.cancel();
+                      } else if (response['status'] == 'error') {
+                        setState(() {
+                          _isGettingResponse = false;
+                          _messages.removeAt(_messages.length - 1);
+                          _messages.add(
+                            Message(
+                              text: "Error: ${response['message']}",
+                              isUser: false,
+                              timestamp: DateTime.now(),
+                              isError: true,
+                            ),
+                          );
+                        });
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          _scrollToBottom();
+                        });
+                        timer.cancel();
+                      }
+                    })
+                    .catchError((error) {
+                      setState(() {
+                        _isGettingResponse = false;
+                        _messages.removeAt(_messages.length - 1);
+                        _messages.add(
+                          Message(
+                            text: "Error: $error",
+                            isUser: false,
+                            timestamp: DateTime.now(),
+                            isError: true,
+                          ),
+                        );
+                      });
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        _scrollToBottom();
+                      });
+                    });
+              });
             }
-            _queryMessage(message);
           });
         } else {
           _queryMessage(message);

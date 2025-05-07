@@ -8,6 +8,8 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:learn_hub/configs/router_config.dart';
 import 'package:learn_hub/const/quizzes_generator_config.dart';
+import 'package:learn_hub/screens/ask.dart';
+import 'package:learn_hub/screens/materials.dart';
 import 'package:learn_hub/services/quizzes_generator.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -40,7 +42,9 @@ final taskStatusesMessage = {
 };
 
 class GenerateQuizzesScreen extends StatefulWidget {
-  const GenerateQuizzesScreen({super.key});
+  final ContextFileInfo? materialDocument;
+
+  const GenerateQuizzesScreen({super.key, this.materialDocument});
 
   @override
   State<GenerateQuizzesScreen> createState() => _GenerateQuizzesScreenState();
@@ -90,13 +94,24 @@ class _GenerateQuizzesScreenState extends State<GenerateQuizzesScreen>
   @override
   void initState() {
     super.initState();
-    tabController = TabController(initialIndex: 0, length: 4, vsync: this);
+    tabController = TabController(initialIndex: 0, length: 5, vsync: this);
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _quizGenerator.loadCurrentTask();
       if (mounted) setState(() {});
       _startStatusRefreshTimer();
     });
+    if (widget.materialDocument != null) {
+      print("Received material document: ${widget.materialDocument}");
+      if (_quizGenerator.currentTask != null) {
+        _quizGenerator.clearCurrentTask();
+      }
+      setState(() {
+        _materialInfo = widget.materialDocument;
+        tabController.animateTo(4);
+        currentIndex = 4;
+      });
+    }
   }
 
   PlatformFile? _selectedFileInfo;
@@ -104,6 +119,7 @@ class _GenerateQuizzesScreenState extends State<GenerateQuizzesScreen>
   File? _selectedImageFile;
   PlatformFile? _selectedImageInfo;
   String? _previewImagePath;
+  ContextFileInfo? _materialInfo;
 
   TextEditingController textContentController = TextEditingController();
   TextEditingController linkController = TextEditingController();
@@ -197,7 +213,6 @@ class _GenerateQuizzesScreenState extends State<GenerateQuizzesScreen>
 
   Future<void> _generateQuizzes() async {
     if (_formKey.currentState!.validate()) {
-      // Validate based on the active tab
       if (currentIndex == 0 &&
           _selectedFile == null &&
           _selectedFileInfo == null) {
@@ -230,6 +245,11 @@ class _GenerateQuizzesScreenState extends State<GenerateQuizzesScreen>
           context,
         ).showSnackBar(SnackBar(content: Text('Please enter a valid URL')));
         return;
+      } else if (currentIndex == 4 && _materialInfo == null) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Please select a document in Material tab')));
+        return;
       }
 
       setState(() {
@@ -255,6 +275,8 @@ class _GenerateQuizzesScreenState extends State<GenerateQuizzesScreen>
             info = _selectedImageInfo;
           case 3:
             sourceType = QuizzesSource.link;
+          case 4:
+            sourceType = QuizzesSource.material;
           default:
             sourceType = QuizzesSource.file;
         }
@@ -266,7 +288,7 @@ class _GenerateQuizzesScreenState extends State<GenerateQuizzesScreen>
           difficulty: difficultyController.value,
           numberOfQuiz: int.parse(quizCountController.text),
           language: languageController.value,
-          isPublic: isPublic
+          isPublic: isPublic,
         );
 
         await _quizGenerator.createQuizzesTask(
@@ -275,6 +297,7 @@ class _GenerateQuizzesScreenState extends State<GenerateQuizzesScreen>
           fileInfo: info,
           text: textContentController.text,
           url: linkController.text,
+          materialId: _materialInfo?.id,
           onProgress: (progress, message) {
             setState(() {
               this.progress = progress;
@@ -584,6 +607,8 @@ class _GenerateQuizzesScreenState extends State<GenerateQuizzesScreen>
       case 3: // Link tab
         return linkController.text.isNotEmpty &&
             Uri.parse(linkController.text).isAbsolute;
+      case 4: // Material tab
+        return _materialInfo != null;
       default:
         return false;
     }
@@ -784,6 +809,58 @@ class _GenerateQuizzesScreenState extends State<GenerateQuizzesScreen>
         ),
         "disabled": false,
       },
+      {
+        "label": "Material",
+        "icon": PhosphorIconsBold.book,
+        "content": SizedBox(
+          height: 180,
+          child:
+              _materialInfo == null
+                  ? Text(
+                    "Please come to Material tab to choose a file and click 'Generate Quizzes From This'",
+                    style: TextStyle(
+                      color: cs.onSurface.withValues(alpha: 0.5),
+                    ),
+                    textAlign: TextAlign.center,
+                  )
+                  : Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      PhosphorIcon(
+                        fileIcons[_materialInfo!.extension] ??
+                            PhosphorIconsLight.file,
+                        size: 36,
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        _materialInfo!.filename != null &&
+                                _materialInfo!.filename!.length > 20
+                            ? "${_materialInfo!.filename!.substring(0, 20)}...${_materialInfo!.extension}"
+                            : "${_materialInfo!.filename}.${_materialInfo!.extension}" ??
+                                "",
+                        style: TextStyle(color: cs.onSurface),
+                        textAlign: TextAlign.center,
+                      ),
+                      Text(
+                        _materialInfo!.size! > 0
+                            ? "${(_materialInfo!.size! / 1024).toStringAsFixed(2)} KB"
+                            : "0 KB",
+                        style: TextStyle(
+                          color: cs.onSurface.withValues(alpha: 0.5),
+                        ),
+                      ),
+                      Text(
+                        "ID: ${_materialInfo!.id}",
+                        style: TextStyle(
+                          color: cs.onSurface.withValues(alpha: 0.5),
+                        ),
+                      ),
+                    ],
+                  ),
+        ),
+        "disabled": false,
+      },
     ];
 
     final hasActiveTask = _quizGenerator.currentTask != null;
@@ -896,6 +973,8 @@ class _GenerateQuizzesScreenState extends State<GenerateQuizzesScreen>
                           indicator: UnderlineTabIndicator(
                             borderSide: BorderSide(color: cs.primary, width: 2),
                           ),
+                          isScrollable: true,
+                          tabAlignment: TabAlignment.center,
                         ),
                         SizedBox(
                           height: 180,

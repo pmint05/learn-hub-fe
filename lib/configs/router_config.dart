@@ -6,6 +6,7 @@ import 'package:learn_hub/configs/router_keys.dart';
 import 'package:learn_hub/models/quiz.dart';
 import 'package:learn_hub/providers/app_auth_provider.dart';
 import 'package:learn_hub/screens/app.dart';
+import 'package:learn_hub/screens/do_quiz_history.dart';
 import 'package:learn_hub/screens/do_quizzes.dart';
 import 'package:learn_hub/screens/do_quizzes_result.dart';
 import 'package:learn_hub/screens/forgot_password.dart';
@@ -36,6 +37,7 @@ enum AppRoute {
   quizResults,
   generateQuiz,
   settings,
+  doQuizHistory,
 }
 
 GoRouter createRouter(AppAuthProvider authProvider) {
@@ -96,7 +98,6 @@ GoRouter createRouter(AppAuthProvider authProvider) {
         builder: (context, state) => const ForgotPasswordScreen(),
       ),
 
-
       GoRoute(
         path: '/do-quizzes',
         name: AppRoute.doQuizzes.name,
@@ -146,9 +147,19 @@ GoRouter createRouter(AppAuthProvider authProvider) {
         path: "/generate-quiz",
         name: AppRoute.generateQuiz.name,
         parentNavigatorKey: rootNavigatorKey,
-        pageBuilder:
-            (context, state) =>
-                const MaterialPage(child: GenerateQuizzesScreen()),
+        pageBuilder: (context, state) {
+          if (state.extra == null) {
+            return const MaterialPage(child: GenerateQuizzesScreen());
+          }
+          final params = state.extra as Map<String, dynamic>;
+          final material =
+              params.containsKey('material')
+                  ? params['material'] as ContextFileInfo
+                  : null;
+          return MaterialPage(
+            child: GenerateQuizzesScreen(materialDocument: material),
+          );
+        },
       ),
 
       GoRoute(
@@ -170,6 +181,13 @@ GoRouter createRouter(AppAuthProvider authProvider) {
         parentNavigatorKey: rootNavigatorKey,
         pageBuilder: (context, state) {
           return const MaterialPage(child: SettingsScreen());
+        },
+      ),
+      GoRoute(path: "/do-quiz-history",
+        name: AppRoute.doQuizHistory.name,
+        parentNavigatorKey: rootNavigatorKey,
+        pageBuilder: (context, state) {
+          return const MaterialPage(child: DoQuizHistoryScreen());
         },
       ),
 

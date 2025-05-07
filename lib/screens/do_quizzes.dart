@@ -2,9 +2,11 @@ import 'package:animations/animations.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:learn_hub/configs/router_config.dart';
+import 'package:learn_hub/const/result_manager_config.dart';
 import 'package:learn_hub/models/quiz.dart';
 import 'package:learn_hub/screens/do_quizzes_result.dart';
 import 'package:learn_hub/services/quiz_manager.dart';
+import 'package:learn_hub/services/result_manager.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 class DoQuizzesScreen extends StatefulWidget {
@@ -34,6 +36,8 @@ class _DoQuizzesScreenState extends State<DoQuizzesScreen> {
   int currentQuestionIndex = 0;
   int? selectedAnswerIndex;
 
+  String? _currentResultId;
+
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   List<Map<String, dynamic>> quizzes = [];
@@ -56,9 +60,28 @@ class _DoQuizzesScreenState extends State<DoQuizzesScreen> {
       quizzes = widget.quizzes!;
     } else if (widget.quiz != null) {
       try {
+        final quizId = widget.quiz!.quizId.toString();
         final quizData = await QuizManager.instance.getQuizById(
-          quizId: widget.quiz!.quizId.toString(),
+          quizId: quizId,
         );
+
+        final createResultData = await ResultManager.instance.createNewResult(
+          CreateResultConfig(quizId: quizId),
+        );
+
+        if (createResultData['status'] == 'success') {
+          setState(() {
+            _currentResultId = createResultData['data'];
+          });
+        } else if (createResultData['status'] == 'error') {
+          setState(() {
+            errorMessage = createResultData['message'] ?? "Failed to create result.";
+          });
+        } else {
+          setState(() {
+            errorMessage = createResultData['message'] ?? "Failed to create result.";
+          });
+        }
 
         if (quizData['status'] == 'success') {
           final questionsData = quizData['data']['questions'];
@@ -161,7 +184,9 @@ class _DoQuizzesScreenState extends State<DoQuizzesScreen> {
 
   void _checkAnswer() {
     final currentQuiz = quizzes[currentQuestionIndex];
-    final correctAnswerIndex = currentQuiz['answer'];
+    final correctAnswerIndex = currentQuiz['answer'] is String
+        ? int.parse(currentQuiz['answer'])
+        : currentQuiz['answer'];
     final isCorrect = selectedAnswerIndex == correctAnswerIndex;
     // print(currentQuiz);
     // print(isCorrect);
@@ -174,6 +199,7 @@ class _DoQuizzesScreenState extends State<DoQuizzesScreen> {
     showModalBottomSheet(
       enableDrag: false,
       context: context,
+      isDismissible: false,
       builder:
           (context) => Container(
             width: double.infinity,
@@ -373,26 +399,30 @@ class _DoQuizzesScreenState extends State<DoQuizzesScreen> {
           ),
           title: const Text('Quiz Error'),
         ),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(PhosphorIconsRegular.warning, size: 48, color: cs.error),
-              const SizedBox(height: 16),
-              Text(
-                errorMessage ?? "No quizzes available!",
-                style: TextStyle(
-                  fontSize: 16,
-                  color: cs.onSurface,
-                  fontFamily: 'BricolageGrotesque',
+        body: Container(
+          padding: const EdgeInsets.all(16),
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(PhosphorIconsRegular.warning, size: 48, color: cs.error),
+                const SizedBox(height: 16),
+                Text(
+                  errorMessage ?? "No quizzes available!",
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: cs.onSurface,
+                    fontFamily: 'BricolageGrotesque',
+                  ),
+                  textAlign: TextAlign.center,
                 ),
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: () => context.goNamed(AppRoute.quizzes.name),
-                child: const Text("Back to Quizzes"),
-              ),
-            ],
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  onPressed: () => context.goNamed(AppRoute.quizzes.name),
+                  child: const Text("Back to Quizzes"),
+                ),
+              ],
+            ),
           ),
         ),
       );

@@ -1,4 +1,4 @@
-enum QuizzesSource { file, text, image, link }
+enum QuizzesSource { file, text, image, link, material }
 
 enum QuizzesType {
   mixed("Mixed"),

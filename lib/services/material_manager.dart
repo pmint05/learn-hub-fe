@@ -51,7 +51,8 @@ class MaterialManager {
   }
 
   Future<Map<String, dynamic>> searchMaterial(
-      SearchMaterialConfig config) async {
+    SearchMaterialConfig config,
+  ) async {
     try {
       print('Searching material with config: ${config.toJson()}');
 
@@ -81,6 +82,44 @@ class MaterialManager {
     } catch (e) {
       print('Error deleting material: $e');
       return {};
+    }
+  }
+
+  Future<Map<String, dynamic>> updateDocumentInfo({
+    required String id,
+    String? title,
+    bool? isPublic,
+  }) async {
+    try {
+      print('Updating document info with id: $id');
+
+      final response = await dio.put(
+        '$baseUrl/document',
+        // data: {
+        //   'title': title,
+        //   'description': description,
+        //   'is_public': isPublic,
+        // },
+        queryParameters: {
+          'document_id': id,
+          if (title != null) 'filename': title,
+          if (isPublic != null) 'is_public': isPublic,
+        },
+        options: Options(headers: await getAuthHeaders('application/json')),
+      );
+
+      return response.data;
+    } catch (e) {
+      if (e is DioException) {
+        print('Dio error: ${e.message}');
+        return e.response?.data ?? {};
+      } else {
+        print('Error updating document info: $e');
+        return {
+          'status': 'error',
+          'message': 'An error occurred while updating document info',
+        };
+      }
     }
   }
 }

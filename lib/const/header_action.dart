@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-enum AppBarActionType { notifications, chatHistory, closeChat, settings, none }
+enum AppBarActionType { notifications, chatHistory, closeChat, settings, doQuizHistory, none }
 
 class HeaderAction {
   final AppBarActionType type;

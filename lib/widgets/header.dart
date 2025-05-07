@@ -190,6 +190,16 @@ class Header extends StatelessWidget implements PreferredSizeWidget {
           style: defaultStyle,
         );
 
+      case AppBarActionType.doQuizHistory:
+        return IconButton(
+          onPressed: onPostfixActionTap,
+          icon: PhosphorIcon(
+            PhosphorIconsBold.clipboardText,
+            color: cs.onSurface,
+            size: 24,
+          ),
+          style: defaultStyle,
+        );
       case AppBarActionType.none:
         return const SizedBox.shrink();
     }

@@ -33,8 +33,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   int? _quizCompleted;
   int? _fileUploaded;
   int? _perfectQuiz;
+  int? _totalQuizAttempts;
 
   bool _isCountingCreatedQuiz = false;
+  bool _isCountingTotalQuizAttempts = false;
 
   StatisticService _statisticService = StatisticService();
 
@@ -81,6 +83,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   void _getStatistics() {
     _countCreatedQuiz();
+    _countTotalQuizAttempts();
   }
 
   void _countCreatedQuiz() async {
@@ -106,6 +109,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } finally {
       setState(() {
         _isCountingCreatedQuiz = false;
+      });
+    }
+  }
+
+  void _countTotalQuizAttempts() async {
+    try {
+      setState(() {
+        _isCountingTotalQuizAttempts = true;
+      });
+      final response = await _statisticService.countTotalQuizAttempts();
+      print(response);
+      final status = response['status'];
+      if (status != 'success') {
+        print('Error: ${response['message']}');
+        return;
+      }
+      final count = response['count'];
+      setState(() {
+        _totalQuizAttempts = count;
+      });
+    } catch (e) {
+      print('Error when getting statistics: $e');
+    } finally {
+      setState(() {
+        _isCountingTotalQuizAttempts = false;
       });
     }
   }
@@ -197,16 +225,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (!isLoading) Text(
-                  number,
-                  style: TextStyle(
-                    color: backgroundColor,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 24,
+                if (!isLoading)
+                  Text(
+                    number,
+                    style: TextStyle(
+                      color: backgroundColor,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 24,
+                    ),
                   ),
-                ),
                 if (isLoading)
-
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 7.0),
                     child: SizedBox(
@@ -286,8 +314,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: SizedBox(
                 height: 72,
                 child: _buildOverviewBox(
-                  number: "$_perfectQuiz",
-                  label: "Perfect Quiz",
+                  isLoading: _isCountingTotalQuizAttempts,
+                  number: "$_totalQuizAttempts",
+                  label: "Total Quiz Attempts",
                   icon: PhosphorIconsFill.checks,
                   backgroundColor: cs.tertiary,
                 ),

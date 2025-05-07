@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:learn_hub/configs/router_config.dart';
 import 'package:learn_hub/const/constants.dart';
 import 'package:learn_hub/const/material_service_config.dart';
 import 'package:learn_hub/screens/ask.dart';
@@ -28,7 +29,7 @@ enum TaskState {
 
 class MaterialDocument {
   final String id;
-  final String name;
+  String name;
   final String extension;
   final int size;
   final DateTime dateAdded;
@@ -46,6 +47,23 @@ class MaterialDocument {
     required this.url,
     required this.userId,
   });
+}
+
+Map<String, dynamic> getSortConfig(SortOption option) {
+  switch (option) {
+    case SortOption.nameAsc:
+      return {'key': 'filename', 'order': 1};
+    case SortOption.nameDesc:
+      return {'key': 'filename', 'order': -1};
+    case SortOption.dateAsc:
+      return {'key': 'date', 'order': 1};
+    case SortOption.dateDesc:
+      return {'key': 'date', 'order': -1};
+    case SortOption.sizeAsc:
+      return {'key': 'file_size', 'order': 1};
+    case SortOption.sizeDesc:
+      return {'key': 'file_size', 'order': -1};
+  }
 }
 
 class MaterialsScreen extends StatefulWidget {
@@ -106,7 +124,10 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
   }
 
   void _onSearchChanged() {
-    if (!mounted || _searchController.text.trim() == '') return;
+    if (!mounted ||
+        _searchController.text.trim() == '' ||
+        _searchController.text.trim() == _searchQuery)
+      return;
 
     if (_debounce?.isActive ?? false) _debounce!.cancel();
     _debounce = Timer(const Duration(milliseconds: 300), () {
@@ -136,12 +157,15 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
         _hasMoreData = true;
       });
 
+      final sortConfig = getSortConfig(_currentSortOption);
       final response = await MaterialManager.instance.searchMaterial(
         SearchMaterialConfig(
           searchText: _searchQuery,
           isPublic: false,
           size: _pageSize,
           start: _currentPage * _pageSize,
+          sortBy: sortConfig['key'],
+          sortOrder: sortConfig['order'],
         ),
       );
       if (response.isNotEmpty) {
@@ -195,6 +219,7 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
       });
 
       final nextPage = _currentPage + 1;
+      final sortConfig = getSortConfig(_currentSortOption);
       final response = await MaterialManager.instance.searchMaterial(
         SearchMaterialConfig(
           searchText: _searchQuery,
@@ -205,6 +230,8 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
           isPublic: false,
           size: _pageSize,
           start: nextPage * _pageSize,
+          sortBy: sortConfig['key'],
+          sortOrder: sortConfig['order'],
         ),
       );
       _handleSearchResponse(response, true);
@@ -281,6 +308,8 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
         _currentPage = 0;
         _hasMoreData = true;
       });
+      final sortConfig = getSortConfig(_currentSortOption);
+      print(sortConfig.toString());
       final SearchMaterialConfig config = SearchMaterialConfig(
         searchText: _searchQuery,
         fileExtension:
@@ -290,6 +319,8 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
         isPublic: false,
         size: _pageSize,
         start: 0,
+        sortBy: sortConfig['key'],
+        sortOrder: sortConfig['order'],
       );
 
       final response = await MaterialManager.instance.searchMaterial(config);
@@ -312,13 +343,21 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
                   .toList();
           setState(() {});
         } else {
-          print('Error applying filters: ${response['message']}');
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error applying filters: ${response['message']}'),
-            ),
-          );
+          print('Error applying filters');
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Error applying filters')));
         }
+      } else {
+        setState(() {
+          _hasMoreData = false;
+        });
+        print('Error applying filters: ${response['message']}');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error applying filters: ${response['message']}'),
+          ),
+        );
       }
     } catch (e) {
       print('Error applying filters: $e');
@@ -436,6 +475,50 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
     });
   }
 
+  Future<void> _updateDocumentName(String docId, String newName) async {
+    try {
+      setState(() {
+        _isProcessingTask = true;
+        _currentTaskState = TaskState.renaming;
+      });
+
+      final response = await MaterialManager.instance.updateDocumentInfo(
+        id: docId,
+        title: newName,
+      );
+
+      if (response['status'] == 'success') {
+        setState(() {
+          final index = _documents.indexWhere((doc) => doc.id == docId);
+          if (index != -1) {
+            _documents[index].name = newName;
+          }
+          // _applyFilters();
+          setState(() {
+            _filteredDocuments = _documents;
+          });
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Document renamed successfully')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error renaming document: ${response['message']}')),
+        );
+      }
+    } catch (e) {
+      print('Error renaming document: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error renaming document: $e')),
+      );
+    } finally {
+      setState(() {
+        _isProcessingTask = false;
+        _currentTaskState = TaskState.searching;
+      });
+    }
+  }
+
   void _showSortFilterBottomSheet() {
     showModalBottomSheet(
       context: context,
@@ -450,6 +533,17 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: cs.onSurface.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -634,6 +728,41 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
           (context) => Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              const SizedBox(height: 16),
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: cs.onSurface.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              ListTile(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+                ),
+                leading: Icon(PhosphorIconsRegular.question, color: cs.primary),
+                title: Text('Generate quiz from this'),
+                onTap: () {
+                  Navigator.pop(context);
+                  if (context.mounted) {
+                    context.pushNamed(
+                      AppRoute.generateQuiz.name,
+                      extra: {
+                        'material': ContextFileInfo(
+                          id: doc.id,
+                          filename: doc.name,
+                          extension: doc.extension,
+                          size: doc.size,
+                        ),
+                      },
+                    );
+                  }
+                },
+              ),
               ListTile(
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
@@ -713,18 +842,41 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
               ),
               TextButton(
                 onPressed: () {
-                  final newName = _renameController.text;
-                  Navigator.pop(context);
-                  // Implement rename functionality
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Document renamed to $newName')),
-                  );
+                  final newName = _renameController.text.trim();
+                  if (_validateDocumentName(newName)) {
+                    Navigator.pop(context);
+                    _updateDocumentName(doc.id, newName);
+                  }
                 },
                 child: Text('Rename'),
               ),
             ],
           ),
     );
+  }
+
+  bool _validateDocumentName(String name) {
+    if (name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Document name cannot be empty')),
+      );
+      return false;
+    }
+    if (name.length > 100) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Document name is too long (maximum 100 characters)')),
+      );
+      return false;
+    }
+    final RegExp invalidChars = RegExp(r'[\\/:*?"<>|]');
+    if (invalidChars.hasMatch(name)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Document name contains invalid characters')),
+      );
+      return false;
+    }
+
+    return true;
   }
 
   Future<void> _downloadDocument(MaterialDocument doc) async {
@@ -1198,7 +1350,7 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
                   child: RefreshIndicator(
                     onRefresh: _loadDocuments,
                     child: ListView.builder(
-                      padding: const EdgeInsets.only(bottom: 80),
+                      padding: const EdgeInsets.only(bottom: 60),
                       controller: _scrollController,
                       itemCount: _filteredDocuments.length + 1,
                       physics: const AlwaysScrollableScrollPhysics(

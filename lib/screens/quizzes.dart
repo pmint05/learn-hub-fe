@@ -4,14 +4,17 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:learn_hub/const/constants.dart';
 import 'package:learn_hub/configs/router_config.dart';
+import 'package:learn_hub/const/header_action.dart';
 import 'package:learn_hub/const/search_quiz_config.dart';
 import 'package:learn_hub/models/quiz.dart';
+import 'package:learn_hub/providers/appbar_provider.dart';
 import 'package:learn_hub/screens/search_quizzes.dart';
 import 'package:learn_hub/services/quiz_manager.dart';
 import 'package:learn_hub/utils/date_helper.dart';
 import 'package:learn_hub/utils/string_helpers.dart';
 import 'package:moment_dart/moment_dart.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:provider/provider.dart';
 
 final Map<String, PhosphorIconData> subjectCategories = {
   "Science": PhosphorIconsRegular.microscope,
@@ -80,9 +83,9 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
 
   Future<void> fetchAllQuizData() async {
     fetchRecentQuizzes();
-    fetchFavoriteQuizzes();
-    fetchCategoryQuizzes();
-    fetchDifficultyQuizzes();
+    // fetchFavoriteQuizzes();
+    // fetchCategoryQuizzes();
+    // fetchDifficultyQuizzes();
   }
 
   Future<List<Map<String, dynamic>>> fetchQuizzes({
@@ -117,6 +120,8 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
       minCreatedDate: DateFormat(
         'dd/MM/yyyy',
       ).format(DateTime.now().subtract(const Duration(days: 30))),
+      sortBy: 'created_date',
+      sortOrder: -1,
     );
 
     recentQuizzes = await fetchQuizzes(
@@ -222,6 +227,12 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
     if (mounted) setState(() {});
   }
 
+  void _showDoQuizHistory() {
+    context.pushNamed(
+      AppRoute.doQuizHistory.name,
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -241,6 +252,12 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<AppBarProvider>(context, listen: false).setHeaderAction(
+        HeaderAction(
+            type: AppBarActionType.doQuizHistory, callback: _showDoQuizHistory),
+      );
+    });
 
     return Scaffold(
       body: AnimationLimiter(
@@ -568,10 +585,12 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
                       searchConfig: SearchQuizConfig(
                         includeUserId: true,
                         searchText: "",
-                        isPublic: true,
-                        size: 5,
+                        size: 10,
                         start: 0,
+                        sortOrder: -1,
+                        sortBy: 'created_date'
                       ),
+                      showSearchBar: true
                     ),
                   );
                 },
@@ -760,6 +779,7 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
               size: 5,
               start: 0,
             ),
+            showSearchBar: true
           ),
         );
       },
@@ -1009,7 +1029,7 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
-                      quiz['DifficultyLevel'] ?? "Unknown",
+                      quiz['difficulty'] != null ? StringHelpers.capitalize(quiz['difficulty']) : "Unknown",
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
