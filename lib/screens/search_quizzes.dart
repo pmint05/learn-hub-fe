@@ -6,7 +6,9 @@ import 'package:learn_hub/const/constants.dart';
 import 'package:learn_hub/const/search_quiz_config.dart';
 import 'package:learn_hub/models/quiz.dart';
 import 'package:learn_hub/services/quiz_manager.dart';
+import 'package:learn_hub/utils/date_helper.dart';
 import 'package:learn_hub/utils/string_helpers.dart';
+import 'package:moment_dart/moment_dart.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 class SearchQuizzesExtra {
@@ -59,6 +61,8 @@ class _SearchQuizzesScreenState extends State<SearchQuizzesScreen> {
     _selectedCategories = _currentSearchConfig.categories ?? [];
     _selectedSortBy = _currentSearchConfig.sortBy;
     _sortOrder = _currentSearchConfig.sortOrder;
+    _selectedDifficulty = _currentSearchConfig.difficulty;
+
     if (widget.searchExtra.showSearchBar ?? false) {
       _searchController.text = _currentSearchConfig.searchText ?? "";
     }
@@ -276,20 +280,17 @@ class _SearchQuizzesScreenState extends State<SearchQuizzesScreen> {
                   if (index == _quizzes.length) {
                     return _isLoadingMore
                         ? Center(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 16.0,
-                        ),
-                        child: CircularProgressIndicator(),
-                      ),
-                    )
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 16.0),
+                            child: CircularProgressIndicator(),
+                          ),
+                        )
                         : SizedBox(
-                      height:
-                      _quizzes.isEmpty
-                          ? MediaQuery.of(context).size.height *
-                          0.6
-                          : 40,
-                    );
+                          height:
+                              _quizzes.isEmpty
+                                  ? MediaQuery.of(context).size.height * 0.6
+                                  : 40,
+                        );
                   }
                   final quiz = _quizzes[index];
 
@@ -799,11 +800,11 @@ class _SearchQuizzesScreenState extends State<SearchQuizzesScreen> {
                             color: cs.onSurface,
                           ),
                         ),
-                        if (quiz.containsKey('description'))
+                        if (quiz.containsKey('created_date'))
                           Padding(
                             padding: const EdgeInsets.only(top: 4),
                             child: Text(
-                              quiz['description'],
+                              'Created ${Moment(DateHelper.utcStringToLocal(quiz['created_date'])).fromNow()}',
                               style: TextStyle(
                                 fontSize: 14,
                                 color: cs.onSurfaceVariant,

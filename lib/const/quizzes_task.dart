@@ -1,15 +1,5 @@
-import 'dart:io';
-import 'dart:typed_data';
-import 'dart:convert';
-import 'package:dio/dio.dart';
-import 'package:file_picker/file_picker.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:learn_hub/const/quizzes_generator_config.dart';
 import 'package:moment_dart/moment_dart.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-
-// Add correct path import for file name handling
-import 'package:path/path.dart' show basename;
 
 class QuizzesTask {
   final String taskId;

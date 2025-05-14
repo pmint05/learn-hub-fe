@@ -13,12 +13,16 @@ class DoQuizzesScreen extends StatefulWidget {
   final List<Map<String, dynamic>>? quizzes;
   final Quiz? quiz;
   final AppRoute? prevRoute;
+  final String? quizId;
+  final String? resultId;
 
   const DoQuizzesScreen({
     super.key,
     this.quizzes = const [],
     this.quiz,
     this.prevRoute,
+    this.quizId,
+    this.resultId,
   });
 
   @override
@@ -27,6 +31,8 @@ class DoQuizzesScreen extends StatefulWidget {
 
 class _DoQuizzesScreenState extends State<DoQuizzesScreen> {
   late final cs = Theme.of(context).colorScheme;
+  String selectedAnswerText = '';
+  bool _isSubmitting = false;
 
   List<int?> userAnswers = [];
   List<bool> answerResults = [];
@@ -61,9 +67,7 @@ class _DoQuizzesScreenState extends State<DoQuizzesScreen> {
     } else if (widget.quiz != null) {
       try {
         final quizId = widget.quiz!.quizId.toString();
-        final quizData = await QuizManager.instance.getQuizById(
-          quizId: quizId,
-        );
+        final quizData = await QuizManager.instance.getQuizById(quizId: quizId);
 
         final createResultData = await ResultManager.instance.createNewResult(
           CreateResultConfig(quizId: quizId),
@@ -75,11 +79,13 @@ class _DoQuizzesScreenState extends State<DoQuizzesScreen> {
           });
         } else if (createResultData['status'] == 'error') {
           setState(() {
-            errorMessage = createResultData['message'] ?? "Failed to create result.";
+            errorMessage =
+                createResultData['message'] ?? "Failed to create result.";
           });
         } else {
           setState(() {
-            errorMessage = createResultData['message'] ?? "Failed to create result.";
+            errorMessage =
+                createResultData['message'] ?? "Failed to create result.";
           });
         }
 
@@ -97,7 +103,9 @@ class _DoQuizzesScreenState extends State<DoQuizzesScreen> {
           }
         } else {
           setState(() {
-            errorMessage = quizData['message'] ?? "Something went wrong while loading quiz, please try again.";
+            errorMessage =
+                quizData['message'] ??
+                "Something went wrong while loading quiz, please try again.";
           });
         }
       } catch (e) {
@@ -106,6 +114,8 @@ class _DoQuizzesScreenState extends State<DoQuizzesScreen> {
           print(e);
         });
       }
+    } else if (widget.resultId != null) {
+      // final resultData = await ResultManager.instance.getResultById(widget.resultId!);
     } else {
       setState(() {
         errorMessage = "No quiz data available";
@@ -183,18 +193,44 @@ class _DoQuizzesScreenState extends State<DoQuizzesScreen> {
   }
 
   void _checkAnswer() {
+    if (_isSubmitting) return;
+    setState(() {
+      _isSubmitting = true;
+    });
     final currentQuiz = quizzes[currentQuestionIndex];
-    final correctAnswerIndex = currentQuiz['answer'] is String
-        ? int.parse(currentQuiz['answer'])
-        : currentQuiz['answer'];
-    final isCorrect = selectedAnswerIndex == correctAnswerIndex;
-    // print(currentQuiz);
-    // print(isCorrect);
-    // print(correctAnswerIndex);
-    // print(selectedAnswerIndex);
+    final questionType = currentQuiz['question_type'] ?? 'multiple_choice';
+    final questionId = currentQuiz['question_id']?.toString() ?? '';
+    bool isCorrect = false;
+    String selectedAnswerText = '';
+    String correctAnswerText = '';
+    if (questionType == 'fill_blank') {
+      // Fill in the blank type logic
+      final userInput = selectedAnswerText;
+      final correctAnswer = currentQuiz['answer'];
+      isCorrect = userInput.toLowerCase() == correctAnswer.toLowerCase();
+      correctAnswerText = correctAnswer.toString();
+    } else {
+      // Multiple choice type logic
+      final correctAnswerIndex =
+          currentQuiz['answer'] is String
+              ? int.parse(currentQuiz['answer'])
+              : currentQuiz['answer'];
+      isCorrect = selectedAnswerIndex == correctAnswerIndex;
+      correctAnswerText =
+          "${String.fromCharCode(65 + (correctAnswerIndex as int))}. ${currentQuiz['options'][correctAnswerIndex]}";
+    }
 
     userAnswers[currentQuestionIndex] = selectedAnswerIndex;
     answerResults[currentQuestionIndex] = isCorrect;
+
+    if (_currentResultId != null) {
+      _sendAnswerInBackground(
+        _currentResultId!,
+        questionId,
+        selectedAnswerIndex ?? -1,
+        isCorrect.toString(),
+      );
+    }
 
     showModalBottomSheet(
       enableDrag: false,
@@ -236,7 +272,7 @@ class _DoQuizzesScreenState extends State<DoQuizzesScreen> {
                       ),
                     ),
                     Text(
-                      "${String.fromCharCode(65 + (correctAnswerIndex as int))}. ${currentQuiz['options'][correctAnswerIndex]}",
+                      correctAnswerText,
                       style: TextStyle(
                         color: isCorrect ? cs.tertiary : cs.onError,
                         fontSize: 20,
@@ -347,7 +383,98 @@ class _DoQuizzesScreenState extends State<DoQuizzesScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       isScrollControlled: false,
-    );
+    ).then((_) {
+      setState(() {
+        _isSubmitting = false;
+      });
+    });
+  }
+
+  void _sendAnswerInBackground(
+    String resultId,
+    String questionId,
+    int answer,
+    String isCorrect,
+  ) {
+    ResultManager.instance
+        .sendAnswer(
+          resultId: resultId,
+          questionId: questionId,
+          answer: answer,
+          isCorrect: isCorrect,
+        )
+        .catchError((e) {
+          debugPrint('Failed to send answer to backend: $e');
+        });
+  }
+
+  Widget _buildQuestionContent(Map<String, dynamic> currentQuiz) {
+    final questionType = currentQuiz['question_type'] ?? 'multiple_choice';
+
+    if (questionType == 'fill_blank') {
+      // Fill in the blank UI
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            currentQuiz['question'],
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              fontFamily: 'BricolageGrotesque',
+            ),
+          ),
+          const SizedBox(height: 20),
+          TextField(
+            onChanged: (value) {
+              setState(() {
+                selectedAnswerText = value;
+                // Enable submission if not empty
+                selectedAnswerIndex = value.isNotEmpty ? 0 : null;
+              });
+            },
+            decoration: InputDecoration(
+              hintText: 'Type your answer here',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: cs.primary, width: 2),
+              ),
+            ),
+          ),
+        ],
+      );
+    } else {
+      // Multiple choice UI - your existing code for options
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            currentQuiz['question'],
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              fontFamily: 'BricolageGrotesque',
+            ),
+          ),
+          const SizedBox(height: 16),
+          ...List.generate(
+            currentQuiz['options'].length,
+            (index) => Padding(
+              padding: const EdgeInsets.only(top: 12.0),
+              child: ChoiceCard(
+                option: currentQuiz['options'][index],
+                index: index,
+                isSelected: selectedAnswerIndex == index,
+                onTap: () => _selectAnswer(index),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
   }
 
   @override
@@ -527,26 +654,32 @@ class _DoQuizzesScreenState extends State<DoQuizzesScreen> {
                   fontFamily: 'BricolageGrotesque',
                 ),
               ),
-              const Spacer(),
-              ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxHeight: MediaQuery.of(context).size.height * 0.5,
-                ),
+              // const Spacer(),
+              // ConstrainedBox(
+              //   constraints: BoxConstraints(
+              //     maxHeight: MediaQuery.of(context).size.height * 0.5,
+              //   ),
+              //   child: SingleChildScrollView(
+              //     child: Column(
+              //       children: List.generate(
+              //         currentQuiz['options'].length,
+              //             (index) => Padding(
+              //           padding: const EdgeInsets.only(top: 12.0),
+              //           child: ChoiceCard(
+              //             option: currentQuiz['options'][index],
+              //             index: index,
+              //             isSelected: selectedAnswerIndex == index,
+              //             onTap: () => _selectAnswer(index),
+              //           ),
+              //         ),
+              //       ),
+              //     ),
+              //   ),
+              // ),
+              const SizedBox(height: 10),
+              Expanded(
                 child: SingleChildScrollView(
-                  child: Column(
-                    children: List.generate(
-                      currentQuiz['options'].length,
-                          (index) => Padding(
-                        padding: const EdgeInsets.only(top: 12.0),
-                        child: ChoiceCard(
-                          option: currentQuiz['options'][index],
-                          index: index,
-                          isSelected: selectedAnswerIndex == index,
-                          onTap: () => _selectAnswer(index),
-                        ),
-                      ),
-                    ),
-                  ),
+                  child: _buildQuestionContent(currentQuiz),
                 ),
               ),
               const SizedBox(height: 16),
@@ -561,14 +694,24 @@ class _DoQuizzesScreenState extends State<DoQuizzesScreen> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(
-                        currentQuestionIndex == quizzes.length - 1
-                            ? 'Done!'
-                            : 'Check Answer',
-                        style: TextStyle(fontSize: 16),
-                      ),
-                      const SizedBox(width: 10),
-                      if (currentQuestionIndex != quizzes.length - 1)
+                      _isSubmitting
+                          ? SizedBox(
+                            height: 16,
+                            width: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                          : Text(
+                            currentQuestionIndex == quizzes.length - 1
+                                ? 'Done!'
+                                : 'Check Answer',
+                            style: TextStyle(fontSize: 16),
+                          ),
+                      if (!_isSubmitting) const SizedBox(width: 10),
+                      if (!_isSubmitting &&
+                          currentQuestionIndex != quizzes.length - 1)
                         PhosphorIcon(
                           PhosphorIconsBold.arrowRight,
                           color:

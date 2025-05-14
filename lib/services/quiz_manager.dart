@@ -26,7 +26,6 @@ class QuizManager {
         data: config.toJson(),
         options: Options(headers: {'Content-Type': 'application/json'}),
       );
-      print(response);
       return response.data;
     } catch (e) {
       print('Error fetching quizzes: $e');

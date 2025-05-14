@@ -34,14 +34,47 @@ class ResultManager {
     }
   }
 
+  Future<Map<String, dynamic>> sendAnswer({
+    required String resultId,
+    required String questionId,
+    required int answer,
+    required String isCorrect,
+  }) async {
+    final url = '$baseUrl/results/$resultId/answer';
+    try {
+      print('Sending answer: $answer for question $questionId');
+      final response = await dio.put(
+        url,
+        data: {
+          'answer': answer,
+          'is_correct': isCorrect,
+          'question_id': questionId,
+        },
+        options: Options(headers: await getAuthHeaders('application/json')),
+      );
+      print(response.data);
+      return response.data;
+    } catch (e) {
+      print('Error sending answer: $e');
+      return {};
+    }
+  }
+
   Future<Map<String, dynamic>> getResultsByUserId(
     GetResultsByUserIdConfig config,
   ) async {
+    print("Getting results with config: ${config.toJson()}");
     final url = '$baseUrl/results/user/${config.currentUserId}';
     try {
       final response = await dio.get(
         url,
         options: Options(headers: await getAuthHeaders('application/json')),
+        queryParameters: {
+          if (config.size != null) 'limit': config.size,
+          if (config.start != null) 'skip': config.start,
+          if (config.sortBy != null) 'sort_by': config.sortBy,
+          if (config.sortOrder != null) 'sort_order': config.sortOrder,
+        },
       );
       return response.data;
     } catch (e) {

@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:learn_hub/configs/router_keys.dart';
@@ -114,11 +112,19 @@ GoRouter createRouter(AppAuthProvider authProvider) {
               params.containsKey('prevRoute')
                   ? params['prevRoute'] as AppRoute?
                   : null;
+          final quizId = params.containsKey('quiz_id')
+              ? params['quiz_id'] as String
+              : null;
+          final resultId = params.containsKey('result_id')
+              ? params['result_id'] as String
+              : null;
           return MaterialPage(
             child: DoQuizzesScreen(
               quizzes: quizzes,
               quiz: quiz,
               prevRoute: prevRoute,
+              quizId: quizId,
+              resultId: resultId,
             ),
           );
         },

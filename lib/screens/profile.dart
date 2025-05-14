@@ -52,6 +52,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   @override
+  void dispose() {
+    super.dispose();
+  }
+
+  @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     cs = Theme.of(context).colorScheme;
@@ -107,9 +112,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } catch (e) {
       print('Error when getting statistics: $e');
     } finally {
-      setState(() {
-        _isCountingCreatedQuiz = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isCountingTotalQuizAttempts = false;
+        });
+      }
     }
   }
 

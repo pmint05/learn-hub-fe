@@ -1,45 +1,5 @@
 import 'dart:ui';
 
-import 'dart:ui';
-
-import 'dart:ui';
-
-import 'dart:ui';
-
-import 'dart:ui';
-
-import 'dart:ui';
-
-import 'dart:ui';
-
-import 'dart:ui';
-
-import 'dart:ui';
-
-import 'dart:ui';
-
-import 'dart:ui';
-
-import 'dart:ui';
-
-import 'dart:ui';
-
-import 'dart:ui';
-
-import 'dart:ui';
-
-import 'dart:ui';
-
-import 'dart:ui';
-
-import 'dart:ui';
-
-import 'dart:ui';
-
-import 'dart:ui';
-
-import 'dart:ui';
-
 final emailRegex = RegExp(
   r"^[a-zA-Z0-9.a-zA-Z0-9.!#$%&'*+-/=?^_`{|}~]+@[a-zA-Z0-9]+\.[a-zA-Z]+",
 );
@@ -50,6 +10,14 @@ enum DifficultyLevel { all, easy, medium, hard, unknown }
 enum FileExtension { all, pdf, docx, doc, txt, md }
 
 enum SortOption { nameAsc, nameDesc, dateAsc, dateDesc, sizeAsc, sizeDesc }
+
+enum QuestionType {
+  multipleChoice,
+  trueFalse,
+  fillInTheBlank,
+  shortAnswer,
+  essay,
+}
 
 final availableCategories = [
   {

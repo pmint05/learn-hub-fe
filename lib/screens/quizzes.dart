@@ -375,6 +375,8 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
                     searchText: _searchController.value.text,
                     size: 10,
                     start: 0,
+                    sortBy: 'created_date',
+                    sortOrder: -1,
                   ),
                   showSearchBar: true,
                 ),
@@ -920,7 +922,7 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
             extra: SearchQuizzesExtra(
               title: Text('${StringHelpers.capitalize(level.name)} Quizzes'),
               searchConfig: SearchQuizConfig(
-                includeUserId: false,
+                includeUserId: true,
                 searchText: "",
                 difficulty: level,
               ),

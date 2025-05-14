@@ -37,7 +37,7 @@ class SearchQuizConfig {
   Map<String, dynamic> toJson() {
     return {
       if (includeUserId) 'user_id': currentUserId,
-      'title': searchText,
+      if (searchText != null && searchText!.isNotEmpty) 'title': searchText,
       if (isPublic != null) 'is_public': isPublic,
       if (categories != null) 'categories': categories,
       if (difficulty != null) 'difficulty': difficulty?.name,

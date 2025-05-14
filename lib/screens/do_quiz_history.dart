@@ -1,7 +1,10 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:learn_hub/configs/router_config.dart';
 import 'package:learn_hub/const/result_manager_config.dart';
 import 'package:learn_hub/services/result_manager.dart';
+import 'package:learn_hub/utils/date_helper.dart';
 import 'package:moment_dart/moment_dart.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
@@ -31,7 +34,7 @@ class _DoQuizHistoryScreenState extends State<DoQuizHistoryScreen> {
       });
 
       final response = await ResultManager.instance.getResultsByUserId(
-        GetResultsByUserIdConfig(),
+        GetResultsByUserIdConfig(sortBy: 'last_modified_date', sortOrder: -1),
       );
 
       if (response['status'] == 'success' && response['data'] != null) {
@@ -73,20 +76,13 @@ class _DoQuizHistoryScreenState extends State<DoQuizHistoryScreen> {
         ),
         centerTitle: true,
       ),
-      body: RefreshIndicator(
-        onRefresh: _loadResults,
-        child: _buildContent(cs),
-      ),
+      body: RefreshIndicator(onRefresh: _loadResults, child: _buildContent(cs)),
     );
   }
 
   Widget _buildContent(ColorScheme cs) {
     if (_isLoading) {
-      return Center(
-        child: CircularProgressIndicator(
-          color: cs.primary,
-        ),
-      );
+      return Center(child: CircularProgressIndicator(color: cs.primary));
     }
 
     if (_errorMessage != null) {
@@ -94,11 +90,7 @@ class _DoQuizHistoryScreenState extends State<DoQuizHistoryScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              PhosphorIconsBold.warning,
-              size: 48,
-              color: cs.error,
-            ),
+            Icon(PhosphorIconsBold.warning, size: 48, color: cs.error),
             const SizedBox(height: 16),
             Text(
               _errorMessage!,
@@ -109,10 +101,7 @@ class _DoQuizHistoryScreenState extends State<DoQuizHistoryScreen> {
               ),
             ),
             const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: _loadResults,
-              child: const Text('Retry'),
-            ),
+            ElevatedButton(onPressed: _loadResults, child: const Text('Retry')),
           ],
         ),
       );
@@ -158,75 +147,88 @@ class _DoQuizHistoryScreenState extends State<DoQuizHistoryScreen> {
       itemCount: _results.length,
       itemBuilder: (context, index) {
         final result = _results[index];
-        final status = List<int>.from(result['status'] ?? []);
+        final status = List<Map<String, dynamic>>.from(result['status'] ?? []);
         final total = status.length;
-        final completed = status.where((item) => item != -1).length;
+        final completed = status.where((item) => item['answer'] != -1).length;
         final correct = (result['num_correct'] ?? 0) as int;
-        final createdDate = DateTime.parse(result['created_date'] ?? '');
+        final lastModified = DateHelper.utcStringToLocal(
+          result['last_modified_date'] ?? '',
+        );
 
-        return Card(
-          margin: const EdgeInsets.only(bottom: 16),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: BorderSide(color: cs.outline.withValues(alpha: 0.2)),
-          ),
-          elevation: 1,
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Quiz ${index + 1}',
-                      style: TextStyle(
-                        fontFamily: 'BricolageGrotesque',
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
+        return GestureDetector(
+          onTap: () {
+            context.pushNamed(
+              AppRoute.doQuizzes.name,
+              extra: {
+                'quiz_id': result['quiz_id'],
+                'result_id': result['result_id'],
+              },
+            );
+          },
+          child: Card(
+            margin: const EdgeInsets.only(bottom: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(color: cs.surfaceDim),
+            ),
+            elevation: 1,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        result['title'] ?? result['quiz_id'] ?? 'Quiz',
+                        style: TextStyle(
+                          fontFamily: 'BricolageGrotesque',
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                    ),
-                    Text(
-                      Moment.parse(createdDate.toString()).fromNow(),
-                      style: TextStyle(
-                        fontFamily: 'BricolageGrotesque',
-                        color: cs.onSurface.withValues(alpha: 0.6),
-                        fontSize: 14,
+                      Text(
+                        Moment.parse(lastModified.toString()).fromNow(),
+                        style: TextStyle(
+                          fontFamily: 'BricolageGrotesque',
+                          color: cs.onSurface.withValues(alpha: 0.6),
+                          fontSize: 14,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    _buildStatusBox(
-                      'Progress',
-                      '$completed/$total',
-                      cs.primary,
-                    ),
-                    const SizedBox(width: 12),
-                    _buildStatusBox(
-                      'Correct',
-                      '$correct/$total',
-                      Colors.green,
-                    ),
-                    const SizedBox(width: 12),
-                    _buildStatusBox(
-                      'Incorrect',
-                      '${(result['num_incorrect'] ?? 0)}/$total',
-                      Colors.red,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                LinearProgressIndicator(
-                  value: total > 0 ? completed / total : 0,
-                  backgroundColor: cs.surface,
-                  borderRadius: BorderRadius.circular(12),
-                  minHeight: 8,
-                ),
-              ],
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      _buildStatusBox(
+                        'Progress',
+                        '$completed/$total',
+                        cs.primary,
+                      ),
+                      const SizedBox(width: 12),
+                      _buildStatusBox(
+                        'Correct',
+                        '$correct/$total',
+                        Colors.green,
+                      ),
+                      const SizedBox(width: 12),
+                      _buildStatusBox(
+                        'Incorrect',
+                        '${(result['num_incorrect'] ?? 0)}/$total',
+                        Colors.red,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  LinearProgressIndicator(
+                    value: total > 0 ? completed / total : 0,
+                    backgroundColor: cs.surface,
+                    borderRadius: BorderRadius.circular(12),
+                    minHeight: 8,
+                  ),
+                ],
+              ),
             ),
           ),
         );
