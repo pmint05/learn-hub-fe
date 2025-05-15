@@ -42,7 +42,7 @@ class ResultManager {
   }) async {
     final url = '$baseUrl/results/$resultId/answer';
     try {
-      print('Sending answer: $answer for question $questionId');
+      print('Sending answer: $answer for question $questionId in result $resultId');
       final response = await dio.put(
         url,
         data: {
@@ -79,6 +79,20 @@ class ResultManager {
       return response.data;
     } catch (e) {
       print('Error getting results by user ID: $e');
+      return {};
+    }
+  }
+
+  Future<Map<String, dynamic>> getResultById({required String resultId}) async {
+    final url = '$baseUrl/results/$resultId';
+    try {
+      final response = await dio.get(
+        url,
+        options: Options(headers: await getAuthHeaders('application/json')),
+      );
+      return response.data;
+    } catch (e) {
+      print('Error getting result data: $e');
       return {};
     }
   }

@@ -8,11 +8,13 @@ class QuizzesTask {
   String status;
   String errorMessage = '';
   List<Map<String, dynamic>>? result;
+  final String quizId;
 
   QuizzesTask({
     required this.taskId,
     required this.createdAt,
     required this.config,
+    required this.quizId,
     this.status = 'pending',
     this.result,
     this.errorMessage = '',
@@ -22,6 +24,7 @@ class QuizzesTask {
 
   Map<String, dynamic> toJson() => {
     'taskId': taskId,
+    'quizId': quizId,
     'createdAt': createdAt.toIso8601String(),
     'config': {
       'source': config.source.name,
@@ -39,6 +42,7 @@ class QuizzesTask {
     return QuizzesTask(
       taskId: json['taskId'],
       createdAt: DateTime.parse(json['createdAt']),
+      quizId: json['quizId'],
       config: QuizzesGeneratorConfig(
         isPublic: json['config']['is_public'] ?? false,
         source: QuizzesSource.values.byName(json['config']['source']),

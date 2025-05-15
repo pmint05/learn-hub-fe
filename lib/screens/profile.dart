@@ -114,7 +114,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } finally {
       if (mounted) {
         setState(() {
-          _isCountingTotalQuizAttempts = false;
+          _isCountingCreatedQuiz = false;
         });
       }
     }

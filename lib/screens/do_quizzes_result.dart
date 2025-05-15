@@ -36,7 +36,7 @@ class _ResultScreenState extends State<ResultScreen>
     _tabController = TabController(length: 3, vsync: this);
     correctCount = widget.answerResults.where((result) => result).length;
     percentage = (correctCount / widget.quizzes.length) * 100;
-
+    
     // Determine performance level
     if (percentage >= 90) {
       performanceLevel = "Excellent";
@@ -298,7 +298,7 @@ class _ResultScreenState extends State<ResultScreen>
                         PhosphorIconsRegular.arrowCounterClockwise,
                         color: cs.primary,
                       ),
-                      label: Text("Retake"),
+                      label: Text("Retake", style: TextStyle(color: cs.primary)),
                       style: ElevatedButton.styleFrom(
                         backgroundColor:
                             Theme.of(context).scaffoldBackgroundColor,

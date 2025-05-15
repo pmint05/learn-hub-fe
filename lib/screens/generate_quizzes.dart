@@ -488,7 +488,7 @@ class _GenerateQuizzesScreenState extends State<GenerateQuizzesScreen>
               width: double.infinity,
               child: ElevatedButton.icon(
                 onPressed: () async {
-                  final result = await _quizGenerator.getTaskResult(
+                  final response = await _quizGenerator.getTaskResult(
                     currentTask.taskId,
                   );
                   if (mounted) {
@@ -500,7 +500,7 @@ class _GenerateQuizzesScreenState extends State<GenerateQuizzesScreen>
                     });
                     context.pushNamed(
                       AppRoute.doQuizzes.name,
-                      extra: {'quizzes': result, 'prevRoute': null},
+                      extra: {'prevRoute': null, 'quiz_id': response['result']['_id']},
                     );
                   }
                 },
@@ -523,14 +523,14 @@ class _GenerateQuizzesScreenState extends State<GenerateQuizzesScreen>
                     final status =
                         _quizGenerator.currentTask?.status ?? 'not_found';
                     if (status == 'completed' && context.mounted) {
-                      final result = await _quizGenerator.getTaskResult(
+                      final response = await _quizGenerator.getTaskResult(
                         currentTask.taskId,
                       );
                       if (mounted) {
                         _quizGenerator.clearCurrentTask();
                         context.pushNamed(
                           AppRoute.doQuizzes.name,
-                          extra: {'quizzes': result, 'prevRoute': null},
+                          extra: {'quiz_id': response['result']['_id'], 'prevRoute': null},
                         );
                       }
                     }

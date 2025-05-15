@@ -115,7 +115,7 @@ GoRouter createRouter(AppAuthProvider authProvider) {
           final quizId = params.containsKey('quiz_id')
               ? params['quiz_id'] as String
               : null;
-          final resultId = params.containsKey('result_id')
+          final resultId = params.containsKey('result_id') && params['result_id'] != null
               ? params['result_id'] as String
               : null;
           return MaterialPage(

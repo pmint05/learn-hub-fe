@@ -161,7 +161,7 @@ class _DoQuizHistoryScreenState extends State<DoQuizHistoryScreen> {
               AppRoute.doQuizzes.name,
               extra: {
                 'quiz_id': result['quiz_id'],
-                'result_id': result['result_id'],
+                'result_id': result['_id'],
               },
             );
           },

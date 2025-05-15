@@ -64,9 +64,10 @@ class _DoQuizzesScreenState extends State<DoQuizzesScreen> {
         widget.quizzes!.isNotEmpty &&
         widget.quiz == null) {
       quizzes = widget.quizzes!;
-    } else if (widget.quiz != null) {
+    } else if (widget.quiz != null ||
+        widget.quizId != null && widget.resultId == null) {
       try {
-        final quizId = widget.quiz!.quizId.toString();
+        final String quizId = widget.quizId ?? widget.quiz!.quizId.toString();
         final quizData = await QuizManager.instance.getQuizById(quizId: quizId);
 
         final createResultData = await ResultManager.instance.createNewResult(
@@ -114,22 +115,122 @@ class _DoQuizzesScreenState extends State<DoQuizzesScreen> {
           print(e);
         });
       }
-    } else if (widget.resultId != null) {
-      // final resultData = await ResultManager.instance.getResultById(widget.resultId!);
+    } else if (widget.resultId != null && widget.quizId != null) {
+      try {
+        final quizResponse = await QuizManager.instance.getQuizById(
+          quizId: widget.quizId!,
+        );
+        final resultResponse = await ResultManager.instance.getResultById(
+          resultId: widget.resultId!,
+        );
+
+        if (quizResponse['status'] == 'success' &&
+            resultResponse['status'] == 'success') {
+          final quizData = quizResponse['data'];
+          final resultData = resultResponse['data'];
+          final answerData = resultData['status'];
+
+          setState(() {
+            quizzes = List<Map<String, dynamic>>.from(quizData['questions']);
+            userAnswers = List.filled(quizzes.length, null);
+            answerResults = List.filled(quizzes.length, false);
+
+            // Process answers if they exist
+            if (answerData != null && answerData is List) {
+              for (int i = 0; i < answerData.length; i++) {
+                final answer = answerData[i];
+                final questionIndex = quizzes.indexWhere(
+                  (q) =>
+                      q['question_id'].toString() ==
+                      answer['question_id'].toString(),
+                );
+
+                if (questionIndex != -1) {
+                  userAnswers[questionIndex] =
+                      answer['answer'] != -1 ? answer['answer'] : null;
+                  answerResults[questionIndex] =
+                      answer['is_correct'] == true ||
+                      answer['is_correct'] == "true";
+                }
+              }
+            } else {
+              print('No answer data found');
+            }
+
+            final unfinishedCount =
+                (resultData['num_unfinished'] as num).toInt();
+            currentQuestionIndex =
+                unfinishedCount > 0
+                    ? quizzes.length - unfinishedCount
+                    : quizzes.length - 1;
+
+            if (unfinishedCount == 0) {
+              _currentResultId = widget.resultId;
+
+              Future.delayed(Duration(milliseconds: 300), () {
+                _showResultScreen();
+              });
+            }
+          });
+        } else {
+          setState(() {
+            errorMessage =
+                resultResponse['message'] ??
+                quizResponse['message'] ??
+                "Failed to load quiz or result data";
+          });
+        }
+      } catch (e) {
+        setState(() {
+          errorMessage = "Error loading quiz and result: $e";
+          print(e);
+        });
+      }
     } else {
       setState(() {
         errorMessage = "No quiz data available";
       });
     }
 
-    // Initialize answer arrays
-    if (quizzes.isNotEmpty) {
+    if (quizzes.isNotEmpty && widget.resultId == null) {
       userAnswers = List.filled(quizzes.length, null);
       answerResults = List.filled(quizzes.length, false);
     }
 
     setState(() {
       isLoading = false;
+    });
+  }
+
+  void _showResultScreen() {
+    if (!mounted) return;
+
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
+      pageBuilder: (context, animation, secondaryAnimation) {
+        return SharedAxisTransition(
+          fillColor: cs.surface,
+          transitionType: SharedAxisTransitionType.horizontal,
+          animation: animation,
+          secondaryAnimation: secondaryAnimation,
+          child: ResultScreen(
+            quizzes: quizzes,
+            userAnswers: userAnswers,
+            answerResults: answerResults,
+          ),
+        );
+      },
+    ).then((result) {
+      if (result != null && result is Map && result['action'] == 'retake') {
+        setState(() {
+          currentQuestionIndex = 0;
+          selectedAnswerIndex = null;
+          userAnswers = List.filled(quizzes.length, null);
+          answerResults = List.filled(quizzes.length, false);
+        });
+      }
     });
   }
 
@@ -309,46 +410,7 @@ class _DoQuizzesScreenState extends State<DoQuizzesScreen> {
                   onPressed: () {
                     Navigator.pop(context);
                     if (currentQuestionIndex == quizzes.length - 1) {
-                      // context.pushNamed(
-                      //   AppRoute.quizResults.name,
-                      //   extra: {
-                      //     "quizzes": widget.quizzes,
-                      //     "userAnswers": userAnswers,
-                      //     "answerResults": answerResults,
-                      //   },
-                      // );
-                      showGeneralDialog(
-                        context: context,
-                        barrierDismissible: true,
-                        barrierLabel:
-                            MaterialLocalizations.of(
-                              context,
-                            ).modalBarrierDismissLabel,
-                        pageBuilder: (context, animation, secondaryAnimation) {
-                          return SharedAxisTransition(
-                            fillColor: cs.surface,
-                            transitionType: SharedAxisTransitionType.horizontal,
-                            animation: animation,
-                            secondaryAnimation: secondaryAnimation,
-                            child: ResultScreen(
-                              quizzes: quizzes,
-                              userAnswers: userAnswers,
-                              answerResults: answerResults,
-                            ),
-                          );
-                        },
-                      ).then((result) {
-                        if (result != null &&
-                            result is Map &&
-                            result['action'] == 'retake') {
-                          setState(() {
-                            currentQuestionIndex = 0;
-                            selectedAnswerIndex = null;
-                            userAnswers = List.filled(quizzes.length, null);
-                            answerResults = List.filled(quizzes.length, false);
-                          });
-                        }
-                      });
+                      _showResultScreen();
                     } else {
                       _nextQuestion();
                     }
@@ -642,15 +704,6 @@ class _DoQuizzesScreenState extends State<DoQuizzesScreen> {
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
                   color: Colors.blue,
-                  fontFamily: 'BricolageGrotesque',
-                ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                currentQuiz['question'],
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
                   fontFamily: 'BricolageGrotesque',
                 ),
               ),

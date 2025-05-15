@@ -180,6 +180,7 @@ class QuizzesGenerator {
           createdAt: DateTime.now(),
           config: config,
           status: status,
+          quizId: ""
         );
 
         await _saveCurrentTask();
@@ -245,6 +246,7 @@ class QuizzesGenerator {
           createdAt: DateTime.now(),
           config: config,
           status: status,
+          quizId: ""
         );
 
         await _saveCurrentTask();
@@ -303,6 +305,7 @@ class QuizzesGenerator {
           createdAt: DateTime.now(),
           config: config,
           status: status,
+          quizId: ""
         );
 
         await _saveCurrentTask();
@@ -363,6 +366,7 @@ class QuizzesGenerator {
           createdAt: DateTime.now(),
           config: config,
           status: status,
+          quizId: ""
         );
 
         await _saveCurrentTask();
@@ -385,7 +389,7 @@ class QuizzesGenerator {
     }
   }
 
-  Future<List<Map<String, dynamic>>> getTaskResult(String taskId) async {
+  Future<Map<String, dynamic>> getTaskResult(String taskId) async {
     try {
       final headers = await getAuthHeaders('application/json');
       final response = await dio.get(
@@ -408,7 +412,7 @@ class QuizzesGenerator {
           await _saveCurrentTask();
         }
 
-        return result;
+        return response.data;
       } else {
         throw Exception('Failed to get result: ${response.statusCode}');
       }
@@ -468,7 +472,11 @@ class QuizzesGenerator {
     }
 
     // Get the result
-    return await getTaskResult(task.taskId);
+    final result = await getTaskResult(task.taskId);
+    return result['result']['questions'] ??
+        result['result']['data'] ??
+        result['result']['quizzes'] ??
+        [];
   }
 }
 
