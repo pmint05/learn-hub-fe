@@ -124,10 +124,7 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
   }
 
   void _onSearchChanged() {
-    if (!mounted ||
-        _searchController.text.trim() == '' ||
-        _searchController.text.trim() == _searchQuery)
-      return;
+    if (!mounted || _searchController.text.trim() == _searchQuery) return;
 
     if (_debounce?.isActive ?? false) _debounce!.cancel();
     _debounce = Timer(const Duration(milliseconds: 300), () {
@@ -503,14 +500,16 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error renaming document: ${response['message']}')),
+          SnackBar(
+            content: Text('Error renaming document: ${response['message']}'),
+          ),
         );
       }
     } catch (e) {
       print('Error renaming document: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error renaming document: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error renaming document: $e')));
     } finally {
       setState(() {
         _isProcessingTask = false;
@@ -857,14 +856,16 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
 
   bool _validateDocumentName(String name) {
     if (name.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Document name cannot be empty')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Document name cannot be empty')));
       return false;
     }
     if (name.length > 100) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Document name is too long (maximum 100 characters)')),
+        SnackBar(
+          content: Text('Document name is too long (maximum 100 characters)'),
+        ),
       );
       return false;
     }
@@ -944,6 +945,81 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
     }
   }
 
+  Future<void> _downloadMultipleDocument(List<String> docIds) async {
+    final status = await Permission.storage.request();
+
+    if (status.isGranted) {
+      // Ask for directory only once
+      final String? selectedDirectory = await FilePicker.platform.getDirectoryPath();
+
+      if (selectedDirectory == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('No directory selected'))
+        );
+        return;
+      }
+
+      try {
+        setState(() {
+          _isProcessingTask = true;
+          _currentTaskState = TaskState.downloading;
+          _downloadProgress = 0.0;
+        });
+
+        // Find all documents to download
+        final docsToDownload = _documents.where((doc) => docIds.contains(doc.id)).toList();
+        int totalFiles = docsToDownload.length;
+        int downloadedFiles = 0;
+
+        // Show initial notification
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Downloading ${totalFiles} files...'))
+        );
+
+        for (final doc in docsToDownload) {
+          final filePath = '$selectedDirectory/${doc.name.contains('.') ? doc.name : '${doc.name}.${doc.extension}'}';
+
+          // Download file
+          await dio.download(
+            doc.url,
+            filePath,
+            onReceiveProgress: (received, total) {
+              if (total != -1) {
+                setState(() {
+                  // Calculate overall progress (current file progress + completed files)
+                  _downloadProgress = (received / total + downloadedFiles) / totalFiles;
+                });
+              }
+            },
+          );
+
+          downloadedFiles++;
+        }
+
+        // All files downloaded
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('${totalFiles} files downloaded successfully'))
+        );
+      } catch (e) {
+        print('Error downloading files: $e');
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error downloading files: $e'))
+        );
+      } finally {
+        setState(() {
+          _isProcessingTask = false;
+          _currentTaskState = TaskState.searching;
+          _downloadProgress = 0.0;
+          _selectedDocuments.removeAll(docIds);
+        });
+      }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Storage permission denied'))
+      );
+    }
+  }
+
   void _showDeleteConfirmation(List<String> docIds) {
     final int count = docIds.length;
 
@@ -998,7 +1074,7 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
           (doc) => docIds.contains(doc.id) && !failedIds.contains(doc.id),
         );
         _selectedDocuments.removeAll(docIds);
-        // _applyFilters();
+        _applyFilters();
       });
 
       final String message =
@@ -1176,7 +1252,12 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
       floatingActionButton: Padding(
         padding: const EdgeInsets.only(bottom: 72),
         child: FloatingActionButton(
-          onPressed: _pickAndUploadFile,
+          elevation: 0,
+          onPressed: !_isProcessingTask ? _pickAndUploadFile : null,
+          backgroundColor:
+              !_isProcessingTask
+                  ? cs.primary
+                  : cs.onSurface.withValues(alpha: 0.2),
           child: Icon(PhosphorIconsRegular.plus),
         ),
       ),
@@ -1253,7 +1334,9 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
                                     PhosphorIconsRegular.downloadSimple,
                                   ),
                                   onPressed: () {
-                                    // Download selected
+                                    _downloadMultipleDocument(
+                                      _selectedDocuments.toList(),
+                                    );
                                   },
                                 ),
                                 IconButton(
