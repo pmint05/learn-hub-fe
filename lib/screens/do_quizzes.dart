@@ -478,15 +478,6 @@ class _DoQuizzesScreenState extends State<DoQuizzesScreen> {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            currentQuiz['question'],
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              fontFamily: 'BricolageGrotesque',
-            ),
-          ),
-          const SizedBox(height: 20),
           TextField(
             onChanged: (value) {
               setState(() {
@@ -513,15 +504,6 @@ class _DoQuizzesScreenState extends State<DoQuizzesScreen> {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            currentQuiz['question'],
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              fontFamily: 'BricolageGrotesque',
-            ),
-          ),
-          const SizedBox(height: 16),
           ...List.generate(
             currentQuiz['options'].length,
             (index) => Padding(
@@ -707,6 +689,15 @@ class _DoQuizzesScreenState extends State<DoQuizzesScreen> {
                   fontFamily: 'BricolageGrotesque',
                 ),
               ),
+              const SizedBox(height: 10),
+              Text(
+                currentQuiz['question'],
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'BricolageGrotesque',
+                ),
+              ),
               // const Spacer(),
               // ConstrainedBox(
               //   constraints: BoxConstraints(
@@ -731,6 +722,7 @@ class _DoQuizzesScreenState extends State<DoQuizzesScreen> {
               // ),
               const SizedBox(height: 10),
               Expanded(
+                flex: 2,
                 child: SingleChildScrollView(
                   child: _buildQuestionContent(currentQuiz),
                 ),

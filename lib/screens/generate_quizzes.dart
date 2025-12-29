@@ -36,7 +36,7 @@ final taskStatusesMessage = {
   "completed": "Your quiz is ready to use.",
   "not_found": "Task not found.",
   "failed": "Failed to generate quiz.",
-  "error": "An error occurred while generating the quiz.",
+  "error": "Something went wrong!",
 };
 
 class GenerateQuizzesScreen extends StatefulWidget {
@@ -244,9 +244,9 @@ class _GenerateQuizzesScreenState extends State<GenerateQuizzesScreen>
         ).showSnackBar(SnackBar(content: Text('Please enter a valid URL')));
         return;
       } else if (currentIndex == 4 && _materialInfo == null) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Please select a document in Material tab')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Please select a document in Material tab')),
+        );
         return;
       }
 
@@ -351,124 +351,110 @@ class _GenerateQuizzesScreenState extends State<GenerateQuizzesScreen>
         color: cs.surface,
         borderRadius: BorderRadius.circular(20),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Badge(
-            label:
-                currentTask.status == "processing"
-                    ? Row(
-                      children: [
-                        SizedBox(
-                          height: 12,
-                          width: 12,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: statusColors[currentTask.status]?.withValues(
-                              alpha: 0.8,
+      child: SingleChildScrollView(
+        padding: EdgeInsets.all(10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Badge(
+              label:
+                  currentTask.status == "processing"
+                      ? Row(
+                        children: [
+                          SizedBox(
+                            height: 12,
+                            width: 12,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: statusColors[currentTask.status]
+                                  ?.withValues(alpha: 0.8),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          currentTask.status,
-                          style: TextStyle(
-                            color: statusColors[currentTask.status]?.withValues(
-                              alpha: 0.8,
+                          const SizedBox(width: 8),
+                          Text(
+                            currentTask.status,
+                            style: TextStyle(
+                              color: statusColors[currentTask.status]
+                                  ?.withValues(alpha: 0.8),
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
                             ),
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
+                          ),
+                        ],
+                      )
+                      : Text(
+                        currentTask.status,
+                        style: TextStyle(
+                          color: statusColors[currentTask.status]?.withValues(
+                            alpha: 0.8,
+                          ),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+              backgroundColor: statusColors[currentTask.status]?.withValues(
+                alpha: 0.2,
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              taskStatusesMessage[currentTask.status] ?? "Unknown status",
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: cs.onSurfaceVariant,
+              ),
+            ),
+
+            const SizedBox(height: 8),
+            _buildTaskInfoRow("ID", currentTask.taskId),
+            _buildTaskInfoRow("Type", currentTask.config.type.label),
+            _buildTaskInfoRow("Mode", currentTask.config.mode.label),
+            _buildTaskInfoRow(
+              "Count",
+              currentTask.config.numberOfQuiz.toString(),
+            ),
+            _buildTaskInfoRow("Created", currentTask.createdAtHumanized),
+            const SizedBox(height: 16),
+            if (['error', 'not_found'].contains(currentTask.status)) ...[
+              if (currentTask.errorMessage.isNotEmpty)
+                ConstrainedBox(
+                  constraints: BoxConstraints(maxHeight: 100),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: cs.error.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: cs.error),
+                    ),
+                    padding: EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      spacing: 10,
+                      children: [
+                        Icon(PhosphorIconsRegular.fileX, color: cs.error),
+                        Flexible(
+                          child: SingleChildScrollView(
+                            child: Text(
+                              currentTask.errorMessage,
+                              style: TextStyle(color: cs.error),
+                            ),
                           ),
                         ),
                       ],
-                    )
-                    : Text(
-                      currentTask.status,
-                      style: TextStyle(
-                        color: statusColors[currentTask.status]?.withValues(
-                          alpha: 0.8,
-                        ),
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
                     ),
-            backgroundColor: statusColors[currentTask.status]?.withValues(
-              alpha: 0.2,
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            taskStatusesMessage[currentTask.status] ?? "Unknown status",
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: cs.onSurfaceVariant,
-            ),
-          ),
-
-          const SizedBox(height: 8),
-          _buildTaskInfoRow("ID", currentTask.taskId),
-          _buildTaskInfoRow("Type", currentTask.config.type.label),
-          _buildTaskInfoRow("Mode", currentTask.config.mode.label),
-          _buildTaskInfoRow(
-            "Count",
-            currentTask.config.numberOfQuiz.toString(),
-          ),
-          _buildTaskInfoRow("Created", currentTask.createdAtHumanized),
-          const SizedBox(height: 16),
-          if (['error', 'not_found'].contains(currentTask.status)) ...[
-            if (currentTask.errorMessage.isNotEmpty)
-              Container(
-                decoration: BoxDecoration(
-                  color: cs.error.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: cs.error),
+                  ),
                 ),
-                padding: EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.start,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  spacing: 10,
-                  children: [
-                    Icon(PhosphorIconsRegular.fileX, color: cs.error),
-                    Flexible(
-                      child: Text(
-                        currentTask.errorMessage,
-                        style: TextStyle(color: cs.error),
-                      ),
-                    ),
-                  ],
+              SizedBox(height: 8),
+              ElevatedButton.icon(
+                icon: Icon(
+                  PhosphorIconsRegular.arrowClockwise,
+                  color: cs.primary,
                 ),
-              ),
-            SizedBox(height: 8),
-            ElevatedButton.icon(
-              icon: Icon(
-                PhosphorIconsRegular.arrowClockwise,
-                color: cs.primary,
-              ),
-              label: Text(
-                "Create Another",
-                style: TextStyle(color: cs.primary),
-              ),
-              onPressed: () async {
-                await _quizGenerator.clearCurrentTask();
-                setState(() {});
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: cs.surface,
-                foregroundColor: cs.onSurface,
-                side: BorderSide(color: cs.primary, width: 2),
-              ),
-            ),
-          ],
-          if (currentTask.status == 'completed') ...[
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                icon: Icon(PhosphorIconsRegular.plus, color: cs.primary),
                 label: Text(
                   "Create Another",
                   style: TextStyle(color: cs.primary),
@@ -483,80 +469,107 @@ class _GenerateQuizzesScreenState extends State<GenerateQuizzesScreen>
                   side: BorderSide(color: cs.primary, width: 2),
                 ),
               ),
-            ),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () async {
-                  final response = await _quizGenerator.getTaskResult(
-                    currentTask.taskId,
-                  );
-                  if (mounted) {
-                    _quizGenerator.clearCurrentTask();
-                    setState(() {
-                      isGenerating = false;
-                      progress = 0.0;
-                      progressMessage = "";
-                    });
-                    context.pushNamed(
-                      AppRoute.doQuizzes.name,
-                      extra: {'prevRoute': null, 'quiz_id': response['result']['_id']},
-                    );
-                  }
-                },
-                icon: Icon(PhosphorIconsRegular.clipboardText),
-                label: Text("Start Quiz"),
+            ],
+            if (currentTask.status == 'completed') ...[
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  icon: Icon(PhosphorIconsRegular.plus, color: cs.primary),
+                  label: Text(
+                    "Create Another",
+                    style: TextStyle(color: cs.primary),
+                  ),
+                  onPressed: () async {
+                    await _quizGenerator.clearCurrentTask();
+                    setState(() {});
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: cs.surface,
+                    foregroundColor: cs.onSurface,
+                    side: BorderSide(color: cs.primary, width: 2),
+                  ),
+                ),
               ),
-            ),
-          ],
-          if (['pending', 'processing'].contains(currentTask.status))
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () async {
-                  if (isCheckingStatus) return;
-                  setState(() {
-                    isCheckingStatus = true;
-                  });
-                  try {
-                    await _quizGenerator.checkCurrentTaskStatus();
-                    final status =
-                        _quizGenerator.currentTask?.status ?? 'not_found';
-                    if (status == 'completed' && context.mounted) {
-                      final response = await _quizGenerator.getTaskResult(
-                        currentTask.taskId,
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () async {
+                    final response = await _quizGenerator.getTaskResult(
+                      currentTask.taskId,
+                    );
+                    if (mounted) {
+                      _quizGenerator.clearCurrentTask();
+                      setState(() {
+                        isGenerating = false;
+                        progress = 0.0;
+                        progressMessage = "";
+                      });
+                      context.pushNamed(
+                        AppRoute.doQuizzes.name,
+                        extra: {
+                          'prevRoute': null,
+                          'quiz_id': response['result']['_id'],
+                        },
                       );
-                      if (mounted) {
-                        _quizGenerator.clearCurrentTask();
-                        context.pushNamed(
-                          AppRoute.doQuizzes.name,
-                          extra: {'quiz_id': response['result']['_id'], 'prevRoute': null},
+                    }
+                  },
+                  icon: Icon(PhosphorIconsRegular.clipboardText),
+                  label: Text("Start Quiz"),
+                ),
+              ),
+            ],
+            if (['pending', 'processing'].contains(currentTask.status))
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () async {
+                    if (isCheckingStatus) return;
+                    setState(() {
+                      isCheckingStatus = true;
+                    });
+                    try {
+                      await _quizGenerator.checkCurrentTaskStatus();
+                      final status =
+                          _quizGenerator.currentTask?.status ?? 'not_found';
+                      if (status == 'completed' && context.mounted) {
+                        final response = await _quizGenerator.getTaskResult(
+                          currentTask.taskId,
                         );
+                        if (mounted) {
+                          _quizGenerator.clearCurrentTask();
+                          context.pushNamed(
+                            AppRoute.doQuizzes.name,
+                            extra: {
+                              'quiz_id': response['result']['_id'],
+                              'prevRoute': null,
+                            },
+                          );
+                        }
+                      }
+                    } finally {
+                      if (mounted) {
+                        setState(() {
+                          isCheckingStatus = false;
+                        });
                       }
                     }
-                  } finally {
-                    if (mounted) {
-                      setState(() {
-                        isCheckingStatus = false;
-                      });
-                    }
-                  }
-                },
-                icon:
-                    isCheckingStatus
-                        ? SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: cs.onPrimary,
-                          ),
-                        )
-                        : Icon(PhosphorIconsRegular.arrowClockwise),
-                label: Text("Check Status"),
+                  },
+                  icon:
+                      isCheckingStatus
+                          ? SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: cs.onPrimary,
+                            ),
+                          )
+                          : Icon(PhosphorIconsRegular.arrowClockwise),
+                  label: Text("Check Status"),
+                ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -1048,7 +1061,7 @@ class _GenerateQuizzesScreenState extends State<GenerateQuizzesScreen>
                               filled: true,
                               fillColor: cs.surface,
                               hint: Text(
-                                "Enter number of questions",
+                                "eg. 20",
                                 style: TextStyle(
                                   color: cs.onSurface.withValues(alpha: 0.5),
                                 ),
